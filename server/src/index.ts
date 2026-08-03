@@ -11,7 +11,8 @@ import { placeOrder, cancelOrder, provideLiquidity } from "./trade";
 import { createAccount, issueEquity, issueBond, issueEtf } from "./issue";
 import { declareDividend, splitShares } from "./actions";
 import { runDueTicks, getWorld } from "./tick";
-import { listSecurities, getAccount, getMarket } from "./queries";
+import { foundNation } from "./nations";
+import { listSecurities, getAccount, getMarket, listNations, getNationDetail } from "./queries";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let indexHtml = "";
@@ -60,9 +61,15 @@ const server = http.createServer(async (req, res) => {
     if (method === "GET" && p === "/healthz") return send(res, 200, { ok: true });
     if (method === "GET" && p === "/world") return send(res, 200, await getWorld());
     if (method === "GET" && p === "/securities") return send(res, 200, await listSecurities());
+    if (method === "GET" && p === "/nations") return send(res, 200, await listNations());
+    if (method === "GET" && p === "/nation") return send(res, 200, await getNationDetail(str(Object.fromEntries(url.searchParams), "id")));
     if (method === "GET" && p === "/account") return send(res, 200, await getAccount(str(Object.fromEntries(url.searchParams), "userId")));
     if (method === "GET" && p === "/market") return send(res, 200, await getMarket(str(Object.fromEntries(url.searchParams), "securityId")));
 
+    if (method === "POST" && p === "/nations") {
+      const b = await readJson(req);
+      return send(res, 200, await foundNation({ id: str(b, "id"), name: str(b, "name"), currency: str(b, "currency"), ownerId: str(b, "ownerId"), grantCash: optStr(b, "grantCash") }));
+    }
     if (method === "POST" && p === "/accounts") {
       const b = await readJson(req);
       return send(res, 200, await createAccount({ userId: str(b, "userId"), handle: optStr(b, "handle"), grantCash: optStr(b, "grantCash"), currency: optStr(b, "currency") }));

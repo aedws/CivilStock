@@ -68,6 +68,40 @@ export async function listSecurities(client: Client): Promise<Array<Record<strin
   return rows;
 }
 
+// ---- 국가 ----
+
+export async function insertNation(
+  client: Client,
+  n: { id: string; name: string; currency: string; ownerId: string },
+): Promise<void> {
+  await client.query(
+    `insert into nations (id, name, currency, owner_user_id) values ($1,$2,$3,$4) on conflict (id) do nothing`,
+    [n.id, n.name, n.currency, n.ownerId],
+  );
+}
+
+export async function listNations(client: Client): Promise<Array<Record<string, unknown>>> {
+  const { rows } = await client.query(
+    `select n.id, n.name, n.currency, n.owner_user_id, count(s.id)::int as company_count
+       from nations n left join securities s on s.nation_id = n.id
+      group by n.id order by n.created_at`,
+  );
+  return rows;
+}
+
+export async function getNation(client: Client, id: string): Promise<Record<string, unknown> | null> {
+  const { rows } = await client.query(`select id, name, currency, owner_user_id from nations where id = $1`, [id]);
+  return rows[0] ?? null;
+}
+
+export async function listSecuritiesByNation(client: Client, nationId: string): Promise<Array<Record<string, unknown>>> {
+  const { rows } = await client.query(
+    `select id, type, ticker, issuer_user_id, currency, status from securities where nation_id = $1 order by created_at`,
+    [nationId],
+  );
+  return rows;
+}
+
 // ---- 계정: 유저 / 현금 / 포지션 ----
 
 export async function upsertUser(client: Client, id: string, handle: string | null): Promise<void> {
