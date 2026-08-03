@@ -7,7 +7,10 @@ DB는 **Neon**(서버리스 Postgres)을 쓴다. 컴퓨팅은 Cloud Run(GCP), DB
 ## 1. Neon 프로젝트 생성 (오너)
 
 - [ ] https://neon.tech 가입(무료 티어) → **New Project**.
-- [ ] 리전은 사용자와 가까운 곳(예: AWS `ap-northeast-1` 도쿄 — 서울에서 가장 가까움).
+- [ ] 리전: Neon 무료 티어의 아시아는 **싱가포르 `ap-southeast-1`** / 시드니뿐이다.
+  서울에서 더 가까운 **싱가포르**를 고른다(서울↔싱가포르 ~70ms, ↔시드니 ~140ms).
+  → Cloud Run도 나중에 **같은 싱가포르(`asia-southeast1`)**에 배포해 DB와 co-locate하면
+  주문당 여러 번의 DB 왕복이 same-region(<5ms)으로 떨어진다.
 - [ ] 데이터베이스 이름: `civilstock`(기본 `neondb`도 무방).
 
 ## 2. 연결 문자열 확보
@@ -20,7 +23,7 @@ Neon 대시보드 **Connection Details**에서 두 종류가 나온다:
 
 형식 예:
 ```
-postgres://USER:PASSWORD@ep-xxxx-pooler.ap-northeast-1.aws.neon.tech/civilstock?sslmode=require
+postgres://USER:PASSWORD@ep-xxxx-pooler.ap-southeast-1.aws.neon.tech/civilstock?sslmode=require
 ```
 
 > 서버는 `sslmode=require`를 자동 감지해 TLS를 켠다(`db.ts`의 `resolveSsl`).
@@ -30,7 +33,7 @@ postgres://USER:PASSWORD@ep-xxxx-pooler.ap-northeast-1.aws.neon.tech/civilstock?
 
 Neon **SQL Editor**에 `server/schema.sql` 내용을 붙여 실행하거나, 로컬에서:
 ```bash
-psql "postgres://USER:PASSWORD@ep-xxxx.ap-northeast-1.aws.neon.tech/civilstock?sslmode=require" \
+psql "postgres://USER:PASSWORD@ep-xxxx.ap-southeast-1.aws.neon.tech/civilstock?sslmode=require" \
   -f server/schema.sql
 ```
 (마이그레이션은 pooled가 아닌 **direct** 연결 권장.)

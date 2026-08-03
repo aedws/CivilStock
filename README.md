@@ -13,7 +13,8 @@
 코드·스키마는 준비됐다. 아래 1~4는 **오너만 할 수 있는** 작업이다.
 
 1. **Neon 프로젝트 생성** — [neon.tech](https://neon.tech) 가입 → New Project
-   (리전은 도쿄 `ap-northeast-1` 권장). 자세히: [`server/NEON.md`](server/NEON.md).
+   (리전은 아시아 중 **싱가포르 `ap-southeast-1`** 권장 — 서울에서 가장 가까움).
+   자세히: [`server/NEON.md`](server/NEON.md).
 2. **스키마 + 시드 적용** — Neon **SQL Editor**에 아래 두 파일 내용을 순서대로 붙여 실행:
    - `server/schema.sql` (테이블 생성)
    - `server/seed.sql` (스모크 테스트용 데모 데이터)

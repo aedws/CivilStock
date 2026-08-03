@@ -1,8 +1,9 @@
 # CivilStock 서버 배포 — 오너 체크리스트
 
 서버 골격(스키마·API·틱)은 코드로 준비돼 있다. **DB는 Neon**(무료·서버리스
-Postgres)을 쓰고, 컴퓨팅만 Cloud Run(GCP)에 올린다. `PROJECT_ID`,
-`REGION`(예: `asia-northeast3`=서울) 등을 자신의 값으로 바꿔 실행한다.
+Postgres)을 쓰고, 컴퓨팅만 Cloud Run(GCP)에 올린다. Neon을 싱가포르에 뒀으므로
+`REGION`도 **`asia-southeast1`(싱가포르)** 권장 — DB와 co-locate해 쿼리 왕복을
+same-region으로. `PROJECT_ID` 등은 자신의 값으로 바꿔 실행한다.
 
 ## 0. 선행
 
@@ -25,7 +26,7 @@ Postgres)을 쓰고, 컴퓨팅만 Cloud Run(GCP)에 올린다. `PROJECT_ID`,
 
 - [ ] `DATABASE_URL`(Neon **pooled** 연결 문자열), `TICK_SECRET` 등록:
   ```bash
-  printf 'postgres://USER:PW@ep-xxxx-pooler.ap-northeast-1.aws.neon.tech/civilstock?sslmode=require' \
+  printf 'postgres://USER:PW@ep-xxxx-pooler.ap-southeast-1.aws.neon.tech/civilstock?sslmode=require' \
     | gcloud secrets create DATABASE_URL --data-file=-
   openssl rand -hex 32 | gcloud secrets create TICK_SECRET --data-file=-
   ```
@@ -71,7 +72,7 @@ Postgres)을 쓰고, 컴퓨팅만 Cloud Run(GCP)에 올린다. `PROJECT_ID`,
 
 1. **Neon 프로젝트 생성 → pooled `DATABASE_URL`** ([`NEON.md`](./NEON.md)). — $0.
 2. **GCP 프로젝트 + 결제 계정 등록**(Cloud Run 무료 티어 내 $0, 등록만 필요).
-3. **REGION** 선택(서울 `asia-northeast3` 권장).
+3. **REGION** 선택(Neon과 co-locate하도록 싱가포르 `asia-southeast1` 권장).
 4. **TICK_SECRET**(`openssl rand -hex 32`).
 
 Cloud SQL을 안 쓰므로 상시 과금이 없다. 위 1~4만 주면 배포까지 함께 진행할 수 있다.
