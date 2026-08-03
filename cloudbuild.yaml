@@ -1,0 +1,13 @@
+# Cloud Build: server/Dockerfile을 리포 루트 컨텍스트로 빌드해 Artifact Registry에 푸시.
+# 사용: gcloud builds submit --config cloudbuild.yaml .
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - server/Dockerfile
+      - -t
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/civilstock/server
+      - .
+images:
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/civilstock/server
