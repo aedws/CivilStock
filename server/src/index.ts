@@ -9,6 +9,7 @@ import { config } from "./config";
 import { HttpError } from "./errors";
 import { placeOrder, cancelOrder, provideLiquidity } from "./trade";
 import { createAccount, issueEquity, issueBond, issueEtf } from "./issue";
+import { declareDividend, splitShares } from "./actions";
 import { runDueTicks, getWorld } from "./tick";
 import { listSecurities, getAccount, getMarket } from "./queries";
 
@@ -82,6 +83,14 @@ const server = http.createServer(async (req, res) => {
     if (method === "POST" && p === "/pools/liquidity") {
       const b = await readJson(req);
       return send(res, 200, await provideLiquidity({ securityId: str(b, "securityId"), providerId: str(b, "providerId"), baseIn: str(b, "baseIn"), quoteIn: str(b, "quoteIn"), feeBps: typeof b.feeBps === "number" ? b.feeBps : undefined }));
+    }
+    if (method === "POST" && p === "/actions/dividend") {
+      const b = await readJson(req);
+      return send(res, 200, await declareDividend({ securityId: str(b, "securityId"), issuerId: str(b, "issuerId"), perShare: str(b, "perShare") }));
+    }
+    if (method === "POST" && p === "/actions/split") {
+      const b = await readJson(req);
+      return send(res, 200, await splitShares({ securityId: str(b, "securityId"), issuerId: str(b, "issuerId"), ratio: Number(b.ratio) }));
     }
     if (method === "POST" && p === "/orders") {
       const b = await readJson(req);

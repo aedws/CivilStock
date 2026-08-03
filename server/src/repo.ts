@@ -20,6 +20,33 @@ export async function getSecurity(
   return row ? { currency: row.currency, status: row.status } : null;
 }
 
+export async function getSecurityFull(
+  client: Client,
+  id: string,
+): Promise<{ issuerUserId: string | null; currency: string; status: string; type: string } | null> {
+  const { rows } = await client.query(
+    `select issuer_user_id, currency, status, type from securities where id = $1 for update`,
+    [id],
+  );
+  const row = rows[0];
+  return row ? { issuerUserId: row.issuer_user_id, currency: row.currency, status: row.status, type: row.type } : null;
+}
+
+/** 특정 증권을 양(+) 보유한 유저 목록(배당·쿠폰 대상). excludeUserId는 제외(발행자 자기지분). */
+export async function holdersOf(
+  client: Client,
+  securityId: string,
+  excludeUserId?: string,
+): Promise<Array<{ userId: string; quantity: string }>> {
+  const { rows } = await client.query(
+    `select user_id, quantity::text as quantity from positions where security_id = $1 and quantity > 0`,
+    [securityId],
+  );
+  return rows
+    .filter((r) => r.user_id !== excludeUserId)
+    .map((r) => ({ userId: r.user_id, quantity: r.quantity }));
+}
+
 export async function insertSecurity(
   client: Client,
   s: {

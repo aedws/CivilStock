@@ -73,6 +73,44 @@
     </div>
   </fieldset>
 
+  <fieldset>
+    <legend>② -b 채권 · ETF 발행 (유저 발행)</legend>
+    <div class="row">
+      <label>채권 id <input id="bond_id" value="bnd_gov" /></label>
+      <label>티커 <input id="bond_ticker" value="GOV5Y" /></label>
+      <label>통화 <input id="bond_cur" value="USD" /></label>
+      <label>액면(minor) <input id="bond_face" value="1000000" /></label>
+      <label>표면금리% <input id="bond_rate" value="5" /></label>
+      <label>만기틱 <input id="bond_mat" value="8760" /></label>
+      <label>쿠폰주기틱 <input id="bond_ci" value="4380" /></label>
+      <label>발행좌수 <input id="bond_units" value="1000" /></label>
+      <button onclick="issueBond()">채권 발행</button>
+    </div>
+    <div class="row" style="margin-top:.6rem">
+      <label>ETF id <input id="etf_id" value="etf_idx" /></label>
+      <label>티커 <input id="etf_ticker" value="IDX" /></label>
+      <label>통화 <input id="etf_cur" value="USD" /></label>
+      <label>구성(예: sec_acme:2) <input id="etf_cons" value="sec_acme:1" style="min-width:14rem" /></label>
+      <button onclick="issueEtf()">ETF 발행</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>⑤ 재무 액션 (발행자 조정) — 배당 · 분할</legend>
+    <div class="row">
+      <label>종목 id <input id="div_sec" value="sec_acme" /></label>
+      <label>발행자 <input id="div_issuer" value="me" /></label>
+      <label>주당 배당(minor) <input id="div_ps" value="10" /></label>
+      <button onclick="declareDividend()">배당 지급</button>
+    </div>
+    <div class="row" style="margin-top:.6rem">
+      <label>종목 id <input id="split_sec" value="sec_acme" /></label>
+      <label>발행자 <input id="split_issuer" value="me" /></label>
+      <label>분할비율(정수≥2) <input id="split_ratio" value="2" /></label>
+      <button onclick="splitShares()">액면분할</button>
+    </div>
+  </fieldset>
+
   <div class="grid2">
     <fieldset>
       <legend>시장</legend>
@@ -127,6 +165,21 @@ async function placeOrder() {
 }
 async function cancelOrder() {
   await api("POST", "/orders/cancel", { orderId: $("ord_id").value, ownerId: $("ord_user").value });
+  loadMarket(); loadAccount();
+}
+async function issueBond() {
+  await api("POST", "/issue/bond", { id: $("bond_id").value, ticker: $("bond_ticker").value, issuerUserId: $("acc_user").value, currency: $("bond_cur").value, faceValue: $("bond_face").value, couponRate: $("bond_rate").value, maturityTick: Number($("bond_mat").value), couponIntervalTicks: Number($("bond_ci").value), unitsIssued: $("bond_units").value });
+}
+async function issueEtf() {
+  const constituents = $("etf_cons").value.split(",").map(s => s.trim()).filter(Boolean).map(pair => { const [securityId, unitsPerShare] = pair.split(":"); return { securityId: securityId.trim(), unitsPerShare: (unitsPerShare||"1").trim() }; });
+  await api("POST", "/issue/etf", { id: $("etf_id").value, ticker: $("etf_ticker").value, issuerUserId: $("acc_user").value, currency: $("etf_cur").value, constituents });
+}
+async function declareDividend() {
+  await api("POST", "/actions/dividend", { securityId: $("div_sec").value, issuerId: $("div_issuer").value, perShare: $("div_ps").value });
+  loadAccount();
+}
+async function splitShares() {
+  await api("POST", "/actions/split", { securityId: $("split_sec").value, issuerId: $("split_issuer").value, ratio: Number($("split_ratio").value) });
   loadMarket(); loadAccount();
 }
 async function loadMarket() { $("mkt_out").textContent = JSON.stringify(await (await fetch("/market?securityId=" + encodeURIComponent($("mkt_sec").value))).json(), null, 2); }
