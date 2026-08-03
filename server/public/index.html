@@ -3,190 +3,349 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>CivilStock — 콘솔</title>
+<title>CivilStock</title>
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 1rem; max-width: 900px; margin-inline: auto; line-height: 1.5; }
-  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
-  .sub { opacity: .7; font-size: .85rem; margin-bottom: 1rem; }
-  fieldset { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 10px; margin: 0 0 1rem; padding: .8rem 1rem 1rem; }
-  legend { font-weight: 600; padding: 0 .4rem; }
-  label { display: inline-flex; flex-direction: column; font-size: .78rem; opacity: .85; margin: .25rem .5rem .25rem 0; }
-  input, select { font: inherit; padding: .35rem .5rem; border-radius: 7px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: transparent; color: inherit; min-width: 7rem; }
-  button { font: inherit; font-weight: 600; padding: .45rem .9rem; border-radius: 8px; border: 0; background: #2563eb; color: #fff; cursor: pointer; margin-top: .5rem; }
-  button.secondary { background: color-mix(in srgb, currentColor 15%, transparent); color: inherit; }
-  .row { display: flex; flex-wrap: wrap; align-items: end; gap: .1rem .3rem; }
-  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .7rem; border-radius: 8px; overflow-x: auto; font-size: .8rem; white-space: pre-wrap; word-break: break-all; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
-  code { background: color-mix(in srgb, currentColor 10%, transparent); padding: .05rem .3rem; border-radius: 4px; }
+  :root {
+    --bg:#0d0d10; --panel:#16161b; --panel2:#1d1d24; --border:#282830;
+    --text:#e9e9ee; --muted:#8b8b96; --up:#f0454e; --down:#4c82f7; --accent:#3182f6;
+    --radius:14px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo",system-ui,sans-serif;
+    font-size:14px; -webkit-font-smoothing:antialiased; }
+  .num { font-variant-numeric:tabular-nums; }
+  .up { color:var(--up); } .down { color:var(--down); } .muted { color:var(--muted); }
+  button { font:inherit; cursor:pointer; border:0; border-radius:10px; }
+  input, select { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--border);
+    border-radius:9px; padding:.5rem .6rem; width:100%; }
+  input:focus, select:focus { outline:1px solid var(--accent); }
+
+  /* top bar */
+  header { display:flex; align-items:center; gap:1rem; padding:.7rem 1.1rem;
+    border-bottom:1px solid var(--border); position:sticky; top:0; background:rgba(13,13,16,.9);
+    backdrop-filter:blur(8px); z-index:20; }
+  .logo { font-weight:800; font-size:1.05rem; letter-spacing:-.02em; }
+  .logo b { color:var(--accent); }
+  .clock { font-size:.8rem; color:var(--muted); }
+  header .spacer { flex:1; }
+  .acct-pick { display:flex; align-items:center; gap:.4rem; }
+  .acct-pick input { width:7rem; }
+
+  main { display:grid; grid-template-columns: 1.2fr 1.6fr .9fr; gap:1rem; padding:1rem; max-width:1500px; margin:0 auto; align-items:start; }
+  @media (max-width:1100px){ main { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); }
+  .card h2 { font-size:.82rem; font-weight:600; color:var(--muted); margin:0; padding:.85rem 1rem .3rem; letter-spacing:.02em; }
+  .pad { padding:1rem; }
+
+  /* market list */
+  .mrow { display:grid; grid-template-columns: 1.6rem 1fr auto auto; gap:.6rem; align-items:center;
+    padding:.6rem 1rem; cursor:pointer; border-top:1px solid var(--border); }
+  .mrow:hover { background:var(--panel2); }
+  .mrow.sel { background:var(--panel2); box-shadow:inset 3px 0 0 var(--accent); }
+  .tk { font-weight:700; } .tag { font-size:.68rem; color:var(--muted); background:var(--panel2);
+    border:1px solid var(--border); border-radius:6px; padding:.05rem .35rem; margin-left:.35rem; }
+  .mrow .price { text-align:right; font-weight:600; } .mrow .chg { text-align:right; min-width:4.2rem; font-size:.85rem; }
+  .rk { color:var(--muted); text-align:center; font-size:.85rem; }
+
+  /* detail */
+  .dhead { display:flex; align-items:baseline; gap:.7rem; padding:1rem 1rem .3rem; flex-wrap:wrap; }
+  .dhead .dtk { font-size:1.15rem; font-weight:800; }
+  .dprice { font-size:1.9rem; font-weight:800; padding:0 1rem; }
+  .dchg { padding:.1rem 1rem 1rem; font-weight:600; }
+  svg.spark { width:100%; height:90px; display:block; }
+  .book { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; padding:.5rem 1rem 1rem; }
+  .book .col { display:flex; flex-direction:column; gap:2px; }
+  .book .lvl { display:flex; justify-content:space-between; padding:.2rem .5rem; border-radius:6px; font-size:.82rem; }
+  .book .ask { background:color-mix(in srgb,var(--down) 12%,transparent); }
+  .book .bid { background:color-mix(in srgb,var(--up) 12%,transparent); }
+
+  /* order ticket */
+  .tabs { display:flex; gap:.3rem; padding:.6rem 1rem 0; }
+  .tabs button { flex:1; padding:.55rem; background:var(--panel2); color:var(--muted); font-weight:700; }
+  .tabs button.on.buy { background:var(--up); color:#fff; } .tabs button.on.sell { background:var(--down); color:#fff; }
+  .ticket { padding:.8rem 1rem 1rem; display:flex; flex-direction:column; gap:.6rem; }
+  .seg { display:flex; gap:.3rem; } .seg button { flex:1; padding:.4rem; background:var(--panel2); color:var(--muted); font-size:.82rem; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  .fieldrow { display:flex; align-items:center; gap:.5rem; }
+  .fieldrow label { width:3.5rem; color:var(--muted); font-size:.8rem; }
+  .quick { display:flex; gap:.3rem; } .quick button { flex:1; padding:.3rem; background:var(--panel2); color:var(--muted); font-size:.78rem; }
+  .total { display:flex; justify-content:space-between; padding:.4rem 0; border-top:1px solid var(--border); }
+  .submit { padding:.85rem; font-weight:800; font-size:1rem; color:#fff; }
+  .submit.buy { background:var(--up); } .submit.sell { background:var(--down); }
+
+  /* portfolio */
+  .net { padding:.4rem 1rem 0; } .net .big { font-size:1.6rem; font-weight:800; }
+  .pos { display:flex; justify-content:space-between; padding:.55rem 1rem; border-top:1px solid var(--border); }
+  .pos .r { text-align:right; }
+
+  /* issuer tools (collapsible) */
+  details.tools { margin:1rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--panel); }
+  details.tools > summary { padding:.8rem 1rem; cursor:pointer; font-weight:700; color:var(--muted); }
+  .tools .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:1rem; padding:0 1rem 1rem; }
+  .tools fieldset { border:1px solid var(--border); border-radius:12px; padding:.7rem .8rem; }
+  .tools legend { font-size:.78rem; color:var(--muted); padding:0 .3rem; }
+  .tools label.f { display:block; font-size:.72rem; color:var(--muted); margin:.3rem 0 .1rem; }
+  .tools button.act { width:100%; margin-top:.5rem; padding:.5rem; background:var(--accent); color:#fff; font-weight:700; }
+
+  /* toast + log */
+  #toast { position:fixed; bottom:1rem; left:50%; transform:translateX(-50%); background:var(--panel2);
+    border:1px solid var(--border); border-radius:10px; padding:.6rem 1rem; max-width:90vw; opacity:0;
+    transition:opacity .2s; pointer-events:none; z-index:50; font-size:.85rem; }
+  #toast.show { opacity:1; }
+  details.log { margin:0 1rem 2rem; } details.log pre { background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; padding:.6rem; font-size:.72rem; overflow:auto; max-height:200px; white-space:pre-wrap; }
 </style>
 </head>
 <body>
-  <h1>CivilStock 콘솔</h1>
-  <div class="sub">유저가 직접 발행하고 거래하는 시장. 서버 권위 · CLOB+AMM · 에스크로 · 자동 틱.</div>
-
-  <fieldset>
-    <legend>① 계정</legend>
-    <div class="row">
-      <label>userId <input id="acc_user" value="me" /></label>
-      <label>통화 <input id="acc_cur" value="USD" /></label>
-      <label>초기 현금(minor) <input id="acc_cash" value="100000000" /></label>
-      <button onclick="createAccount()">계정 생성 + 현금 지급</button>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>② 발행 (IPO)</legend>
-    <div class="row">
-      <label>종목 id <input id="iss_id" value="sec_acme" /></label>
-      <label>티커 <input id="iss_ticker" value="ACME" /></label>
-      <label>통화 <input id="iss_cur" value="USD" /></label>
-      <label>발행주식수 <input id="iss_shares" value="1000000" /></label>
-      <button onclick="issueEquity()">주식 발행</button>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>③ AMM 유동성 예치 (시장 조성)</legend>
-    <div class="row">
-      <label>종목 id <input id="lp_sec" value="sec_acme" /></label>
-      <label>공급자 <input id="lp_user" value="me" /></label>
-      <label>주식 넣기 <input id="lp_base" value="1000" /></label>
-      <label>현금 넣기(minor) <input id="lp_quote" value="100000" /></label>
-      <button onclick="provideLiquidity()">유동성 예치</button>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>④ 주문</legend>
-    <div class="row">
-      <label>주문 id <input id="ord_id" value="o1" /></label>
-      <label>종목 <input id="ord_sec" value="sec_acme" /></label>
-      <label>계정 <input id="ord_user" value="me" /></label>
-      <label>방향 <select id="ord_side"><option>buy</option><option>sell</option></select></label>
-      <label>수량 <input id="ord_qty" value="5" /></label>
-      <label>지정가(비우면 시장가) <input id="ord_limit" placeholder="market" /></label>
-      <button onclick="placeOrder()">주문</button>
-      <button class="secondary" onclick="cancelOrder()">이 주문 취소</button>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>② -b 채권 · ETF 발행 (유저 발행)</legend>
-    <div class="row">
-      <label>채권 id <input id="bond_id" value="bnd_gov" /></label>
-      <label>티커 <input id="bond_ticker" value="GOV5Y" /></label>
-      <label>통화 <input id="bond_cur" value="USD" /></label>
-      <label>액면(minor) <input id="bond_face" value="1000000" /></label>
-      <label>표면금리% <input id="bond_rate" value="5" /></label>
-      <label>만기틱 <input id="bond_mat" value="8760" /></label>
-      <label>쿠폰주기틱 <input id="bond_ci" value="4380" /></label>
-      <label>발행좌수 <input id="bond_units" value="1000" /></label>
-      <button onclick="issueBond()">채권 발행</button>
-    </div>
-    <div class="row" style="margin-top:.6rem">
-      <label>ETF id <input id="etf_id" value="etf_idx" /></label>
-      <label>티커 <input id="etf_ticker" value="IDX" /></label>
-      <label>통화 <input id="etf_cur" value="USD" /></label>
-      <label>구성(예: sec_acme:2) <input id="etf_cons" value="sec_acme:1" style="min-width:14rem" /></label>
-      <button onclick="issueEtf()">ETF 발행</button>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>⑤ 재무 액션 (발행자 조정) — 배당 · 분할</legend>
-    <div class="row">
-      <label>종목 id <input id="div_sec" value="sec_acme" /></label>
-      <label>발행자 <input id="div_issuer" value="me" /></label>
-      <label>주당 배당(minor) <input id="div_ps" value="10" /></label>
-      <button onclick="declareDividend()">배당 지급</button>
-    </div>
-    <div class="row" style="margin-top:.6rem">
-      <label>종목 id <input id="split_sec" value="sec_acme" /></label>
-      <label>발행자 <input id="split_issuer" value="me" /></label>
-      <label>분할비율(정수≥2) <input id="split_ratio" value="2" /></label>
-      <button onclick="splitShares()">액면분할</button>
-    </div>
-  </fieldset>
-
-  <div class="grid2">
-    <fieldset>
-      <legend>시장</legend>
-      <div class="row"><label>종목 <input id="mkt_sec" value="sec_acme" /></label><button class="secondary" onclick="loadMarket()">새로고침</button></div>
-      <pre id="mkt_out">—</pre>
-    </fieldset>
-    <fieldset>
-      <legend>내 계정</legend>
-      <div class="row"><label>userId <input id="q_user" value="me" /></label><button class="secondary" onclick="loadAccount()">조회</button></div>
-      <pre id="acc_out">—</pre>
-    </fieldset>
+<header>
+  <div class="logo">Civil<b>Stock</b></div>
+  <div class="clock" id="clock">tick —</div>
+  <div class="spacer"></div>
+  <div class="acct-pick">
+    <span class="muted">계정</span>
+    <input id="user" value="me" onchange="switchUser()" />
   </div>
+</header>
 
-  <fieldset>
-    <legend>세계 시계 · 틱</legend>
-    <div class="row">
-      <button class="secondary" onclick="loadWorld()">/world 조회</button>
-      <label>TICK_SECRET <input id="tick_secret" value="dev-secret" /></label>
-      <button onclick="runTick()">/tick 실행(밀린 틱 따라잡기)</button>
+<main>
+  <!-- 시장 -->
+  <section class="card" style="overflow:hidden">
+    <h2>시장 · 종목</h2>
+    <div id="mlist"></div>
+  </section>
+
+  <!-- 종목 상세 + 주문 -->
+  <section class="card" id="detail" style="overflow:hidden">
+    <div class="dhead"><span class="dtk" id="d_tk">—</span><span class="tag" id="d_type"></span></div>
+    <div class="dprice num" id="d_price">—</div>
+    <div class="dchg num" id="d_chg"></div>
+    <svg class="spark" id="spark" viewBox="0 0 300 90" preserveAspectRatio="none"></svg>
+    <h2>호가</h2>
+    <div class="book"><div class="col" id="asks"></div><div class="col" id="bids"></div></div>
+
+    <div class="tabs">
+      <button id="tab_buy" class="on buy" onclick="setSide('buy')">구매</button>
+      <button id="tab_sell" class="sell" onclick="setSide('sell')">판매</button>
     </div>
-    <pre id="world_out">—</pre>
-  </fieldset>
+    <div class="ticket">
+      <div class="seg"><button id="seg_limit" class="on" onclick="setType('limit')">지정가</button>
+        <button id="seg_market" onclick="setType('market')">시장가</button></div>
+      <div class="fieldrow" id="pricerow"><label>가격</label><input id="o_price" class="num" /></div>
+      <div class="fieldrow"><label>수량</label><input id="o_qty" class="num" value="1" oninput="calcTotal()" /></div>
+      <div class="quick"><button onclick="qpct(.1)">10%</button><button onclick="qpct(.25)">25%</button>
+        <button onclick="qpct(.5)">50%</button><button onclick="qpct(1)">최대</button></div>
+      <div class="total"><span class="muted">총 주문금액</span><span class="num" id="o_total">—</span></div>
+      <button class="submit buy" id="submit" onclick="submitOrder()">구매하기</button>
+    </div>
+  </section>
 
-  <fieldset>
-    <legend>응답 로그</legend>
-    <pre id="log">준비됨.</pre>
-  </fieldset>
+  <!-- 내 계좌 -->
+  <section class="card">
+    <h2>내 계좌</h2>
+    <div class="net"><div class="muted" id="p_cur">USD</div><div class="big num" id="p_net">—</div></div>
+    <div id="p_positions" style="margin-top:.5rem"></div>
+  </section>
+</main>
+
+<details class="tools">
+  <summary>⚙ 발행 · 유동성 · 재무 (운영 도구)</summary>
+  <div class="grid">
+    <fieldset><legend>계정 만들기</legend>
+      <label class="f">userId</label><input id="t_acc_id" value="me" />
+      <label class="f">초기현금(minor)</label><input id="t_acc_cash" value="100000000" />
+      <button class="act" onclick="tCreateAccount()">계정 생성 + 현금</button></fieldset>
+
+    <fieldset><legend>주식 발행 (IPO)</legend>
+      <label class="f">종목id</label><input id="t_eq_id" value="sec_acme" />
+      <label class="f">티커</label><input id="t_eq_tk" value="ACME" />
+      <label class="f">발행주식수</label><input id="t_eq_sh" value="1000000" />
+      <button class="act" onclick="tIssueEquity()">발행</button></fieldset>
+
+    <fieldset><legend>AMM 유동성</legend>
+      <label class="f">종목id</label><input id="t_lp_id" value="sec_acme" />
+      <label class="f">주식 넣기</label><input id="t_lp_b" value="1000" />
+      <label class="f">현금 넣기(minor)</label><input id="t_lp_q" value="100000" />
+      <button class="act" onclick="tLiquidity()">예치</button></fieldset>
+
+    <fieldset><legend>채권 발행</legend>
+      <label class="f">id</label><input id="t_bd_id" value="bnd_gov" />
+      <label class="f">티커</label><input id="t_bd_tk" value="GOV5Y" />
+      <label class="f">액면(minor)</label><input id="t_bd_face" value="1000000" />
+      <label class="f">금리% / 만기틱 / 쿠폰주기</label>
+      <div style="display:flex;gap:.3rem"><input id="t_bd_rate" value="5" /><input id="t_bd_mat" value="8760" /><input id="t_bd_ci" value="4380" /></div>
+      <label class="f">발행좌수</label><input id="t_bd_u" value="1000" />
+      <button class="act" onclick="tIssueBond()">발행</button></fieldset>
+
+    <fieldset><legend>ETF 발행</legend>
+      <label class="f">id</label><input id="t_etf_id" value="etf_idx" />
+      <label class="f">티커</label><input id="t_etf_tk" value="IDX" />
+      <label class="f">구성 (id:비중, 쉼표)</label><input id="t_etf_c" value="sec_acme:1" />
+      <button class="act" onclick="tIssueEtf()">발행</button></fieldset>
+
+    <fieldset><legend>배당</legend>
+      <label class="f">종목id</label><input id="t_dv_id" value="sec_acme" />
+      <label class="f">주당 배당(minor)</label><input id="t_dv_ps" value="10" />
+      <button class="act" onclick="tDividend()">전 보유자에 지급</button></fieldset>
+
+    <fieldset><legend>액면분할</legend>
+      <label class="f">종목id</label><input id="t_sp_id" value="sec_acme" />
+      <label class="f">분할비율(정수≥2)</label><input id="t_sp_r" value="2" />
+      <button class="act" onclick="tSplit()">분할</button></fieldset>
+
+    <fieldset><legend>세계 틱</legend>
+      <label class="f">TICK_SECRET</label><input id="t_tick_secret" placeholder="배포 시크릿" />
+      <button class="act" onclick="tTick()">틱 실행(밀린 틱 따라잡기)</button></fieldset>
+  </div>
+</details>
+
+<details class="log"><summary class="muted" style="cursor:pointer;padding:0 0 .4rem">응답 로그</summary><pre id="log">준비됨.</pre></details>
+<div id="toast"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const log = (label, data) => { $("log").textContent = label + "\n" + JSON.stringify(data, null, 2); };
-async function api(method, path, body, headers) {
-  const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(headers||{}) }, body: body ? JSON.stringify(body) : undefined });
-  const json = await res.json().catch(() => ({}));
-  log(`${method} ${path} → ${res.status}`, json);
-  return json;
+const state = { user:"me", securities:[], selected:null, market:null, account:null, side:"buy", otype:"limit" };
+
+// ---- helpers ----
+const sym = (c) => c === "USD" ? "$" : (c ? c + " " : "$");
+function money(minor, currency) {
+  const n = Number(minor) / 100;
+  if (!isFinite(n)) return String(minor);
+  return sym(currency) + n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-async function createAccount() {
-  await api("POST", "/accounts", { userId: $("acc_user").value, currency: $("acc_cur").value, grantCash: $("acc_cash").value });
+function pxToDisplay(minor, currency){ return money(minor, currency); }
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2600); }
+function logJson(label,data){ $("log").textContent = label+"\n"+JSON.stringify(data,null,2); }
+async function api(method, path, body, headers){
+  const res = await fetch(path,{method,headers:{"content-type":"application/json",...(headers||{})},body:body?JSON.stringify(body):undefined});
+  const j = await res.json().catch(()=>({}));
+  logJson(`${method} ${path} → ${res.status}`, j);
+  if (!res.ok) toast("⚠ " + (j.error||res.status));
+  return { ok:res.ok, json:j };
 }
-async function issueEquity() {
-  await api("POST", "/issue/equity", { id: $("iss_id").value, ticker: $("iss_ticker").value, issuerUserId: $("acc_user").value, currency: $("iss_cur").value, sharesOutstanding: $("iss_shares").value });
+
+// ---- market list ----
+async function loadSecurities(){
+  const r = await (await fetch("/securities")).json();
+  state.securities = Array.isArray(r) ? r : [];
+  // fetch spot/last for each
+  const rows = await Promise.all(state.securities.map(async s=>{
+    const m = await (await fetch("/market?securityId="+encodeURIComponent(s.id))).json();
+    return { s, m };
+  }));
+  const el = $("mlist"); el.innerHTML = "";
+  rows.forEach(({s,m},i)=>{
+    const last = lastPrice(m); const chg = changePct(m);
+    const div = document.createElement("div");
+    div.className = "mrow" + (state.selected===s.id?" sel":"");
+    div.onclick = ()=>selectSecurity(s.id);
+    const chgCls = chg>0?"up":chg<0?"down":"muted";
+    div.innerHTML = `<div class="rk">${i+1}</div>
+      <div><span class="tk">${s.ticker}</span><span class="tag">${s.type}</span></div>
+      <div class="price num">${last==null?"—":pxToDisplay(last,s.currency)}</div>
+      <div class="chg num ${chgCls}">${chg==null?"":(chg>0?"+":"")+chg.toFixed(2)+"%"}</div>`;
+    el.appendChild(div);
+  });
+  if (!state.selected && state.securities[0]) selectSecurity(state.securities[0].id);
 }
-async function provideLiquidity() {
-  await api("POST", "/pools/liquidity", { securityId: $("lp_sec").value, providerId: $("lp_user").value, baseIn: $("lp_base").value, quoteIn: $("lp_quote").value });
-  loadMarket();
+function lastPrice(m){ if(m&&m.trades&&m.trades.length) return m.trades[0].price; if(m&&m.ammSpot) return m.ammSpot; return null; }
+function changePct(m){ if(!m||!m.trades||m.trades.length<2) return null; const last=Number(m.trades[0].price), open=Number(m.trades[m.trades.length-1].price); if(!open) return null; return (last-open)/open*100; }
+
+// ---- detail ----
+async function selectSecurity(id){
+  state.selected = id;
+  const s = state.securities.find(x=>x.id===id); if(!s) return;
+  const m = await (await fetch("/market?securityId="+encodeURIComponent(id))).json();
+  state.market = m; state.sec = s;
+  $("d_tk").textContent = s.ticker; $("d_type").textContent = s.type;
+  const last = lastPrice(m); const chg = changePct(m);
+  $("d_price").textContent = last==null?"—":pxToDisplay(last,s.currency);
+  const chgEl=$("d_chg"); const cls=chg>0?"up":chg<0?"down":"muted";
+  chgEl.className="dchg num "+cls; chgEl.textContent = chg==null? "체결 대기" : (chg>0?"▲ ":chg<0?"▼ ":"")+Math.abs(chg).toFixed(2)+"%";
+  drawSpark(m); drawBook(m,s);
+  if (last!=null && !document.activeElement.id?.startsWith?.("o_")) $("o_price").value = last;
+  calcTotal();
+  document.querySelectorAll(".mrow").forEach(e=>e.classList.remove("sel"));
+  loadSecuritiesHighlight();
 }
-async function placeOrder() {
-  const limit = $("ord_limit").value.trim();
-  await api("POST", "/orders", { orderId: $("ord_id").value, securityId: $("ord_sec").value, ownerId: $("ord_user").value, side: $("ord_side").value, quantity: $("ord_qty").value, limitPrice: limit || undefined });
-  loadMarket(); loadAccount();
+function loadSecuritiesHighlight(){ /* re-highlight without full reload */ }
+function drawSpark(m){
+  const svg=$("spark"); const t=(m&&m.trades)?[...m.trades].reverse():[];
+  if(t.length<2){ svg.innerHTML=""; return; }
+  const ps=t.map(x=>Number(x.price)); const min=Math.min(...ps),max=Math.max(...ps); const rng=(max-min)||1;
+  const pts=ps.map((p,i)=>`${(i/(ps.length-1))*300},${88-((p-min)/rng)*84}`).join(" ");
+  const up=ps[ps.length-1]>=ps[0]; const col=up?getCss("--up"):getCss("--down");
+  svg.innerHTML=`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2"/>`;
 }
-async function cancelOrder() {
-  await api("POST", "/orders/cancel", { orderId: $("ord_id").value, ownerId: $("ord_user").value });
-  loadMarket(); loadAccount();
+function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function drawBook(m,s){
+  const asks=(m.asks||[]).slice().reverse(), bids=(m.bids||[]);
+  $("asks").innerHTML = asks.map(a=>`<div class="lvl ask"><span class="down num">${pxToDisplay(a.price,s.currency)}</span><span class="muted num">${a.quantity}</span></div>`).join("") || `<div class="lvl muted">매도호가 없음</div>`;
+  $("bids").innerHTML = bids.map(b=>`<div class="lvl bid"><span class="up num">${pxToDisplay(b.price,s.currency)}</span><span class="muted num">${b.quantity}</span></div>`).join("") || `<div class="lvl muted">매수호가 없음</div>`;
 }
-async function issueBond() {
-  await api("POST", "/issue/bond", { id: $("bond_id").value, ticker: $("bond_ticker").value, issuerUserId: $("acc_user").value, currency: $("bond_cur").value, faceValue: $("bond_face").value, couponRate: $("bond_rate").value, maturityTick: Number($("bond_mat").value), couponIntervalTicks: Number($("bond_ci").value), unitsIssued: $("bond_units").value });
+
+// ---- order ticket ----
+function setSide(sd){ state.side=sd; $("tab_buy").className="buy"+(sd==="buy"?" on":""); $("tab_sell").className="sell"+(sd==="sell"?" on":"");
+  const b=$("submit"); b.className="submit "+sd; b.textContent=sd==="buy"?"구매하기":"판매하기"; calcTotal(); }
+function setType(t){ state.otype=t; $("seg_limit").className=t==="limit"?"on":""; $("seg_market").className=t==="market"?"on":"";
+  $("pricerow").style.display=t==="market"?"none":"flex"; calcTotal(); }
+function calcTotal(){
+  const price = state.otype==="market" ? Number(lastPrice(state.market)||0) : Number($("o_price").value||0);
+  const qty = Number($("o_qty").value||0);
+  const cur = state.sec?state.sec.currency:"USD";
+  $("o_total").textContent = money(Math.round(price*qty), cur);
 }
-async function issueEtf() {
-  const constituents = $("etf_cons").value.split(",").map(s => s.trim()).filter(Boolean).map(pair => { const [securityId, unitsPerShare] = pair.split(":"); return { securityId: securityId.trim(), unitsPerShare: (unitsPerShare||"1").trim() }; });
-  await api("POST", "/issue/etf", { id: $("etf_id").value, ticker: $("etf_ticker").value, issuerUserId: $("acc_user").value, currency: $("etf_cur").value, constituents });
+function qpct(f){
+  const price = Number($("o_price").value|| lastPrice(state.market) || 0);
+  if(state.side==="buy"){ const cash=accountCash(); if(price>0) $("o_qty").value=Math.floor((cash/price)*f*1e6)/1e6; }
+  else { const pos=accountPos(state.selected); $("o_qty").value=Math.floor(pos*f*1e6)/1e6; }
+  calcTotal();
 }
-async function declareDividend() {
-  await api("POST", "/actions/dividend", { securityId: $("div_sec").value, issuerId: $("div_issuer").value, perShare: $("div_ps").value });
-  loadAccount();
+async function submitOrder(){
+  if(!state.selected) return toast("종목을 선택하세요");
+  const body={ orderId:"o_"+Date.now(), securityId:state.selected, ownerId:state.user, side:state.side, quantity:String($("o_qty").value||"0") };
+  if(state.otype==="limit") body.limitPrice=String($("o_price").value||"0");
+  const {ok,json}=await api("POST","/orders",body);
+  if(ok){ toast((state.side==="buy"?"매수":"매도")+" 체결 "+ (json.filled||"0")+"주"); await selectSecurity(state.selected); await loadAccount(); await loadSecurities(); }
 }
-async function splitShares() {
-  await api("POST", "/actions/split", { securityId: $("split_sec").value, issuerId: $("split_issuer").value, ratio: Number($("split_ratio").value) });
-  loadMarket(); loadAccount();
+
+// ---- account ----
+function accountCash(){ const c=state.account&&state.account.cash&&state.account.cash.find(x=>x.currency===(state.sec?state.sec.currency:"USD")); return c?Number(c.balance)/100:0; }
+function accountPos(secId){ const p=state.account&&state.account.positions&&state.account.positions.find(x=>x.security_id===secId); return p?Number(p.quantity):0; }
+async function loadAccount(){
+  const a = await (await fetch("/account?userId="+encodeURIComponent(state.user))).json();
+  state.account = a;
+  const cur = state.sec?state.sec.currency:"USD";
+  const cashRow = (a.cash||[]).find(c=>c.currency===cur) || (a.cash||[])[0];
+  $("p_cur").textContent = (cashRow?cashRow.currency:cur)+" 현금";
+  $("p_net").textContent = cashRow?money(cashRow.balance,cashRow.currency):money(0,cur);
+  const secById = Object.fromEntries(state.securities.map(s=>[s.id,s]));
+  $("p_positions").innerHTML = (a.positions||[]).length ? (a.positions||[]).map(p=>{
+    const s=secById[p.security_id]; const tk=s?s.ticker:p.security_id;
+    return `<div class="pos"><div><b>${tk}</b> <span class="muted num">${p.quantity}</span></div>
+      <div class="r"><button style="background:var(--panel2);color:var(--text);padding:.25rem .6rem" onclick="selectSecurity('${p.security_id}')">거래</button></div></div>`;
+  }).join("") : `<div class="pos muted">보유 종목 없음</div>`;
 }
-async function loadMarket() { $("mkt_out").textContent = JSON.stringify(await (await fetch("/market?securityId=" + encodeURIComponent($("mkt_sec").value))).json(), null, 2); }
-async function loadAccount() { $("acc_out").textContent = JSON.stringify(await (await fetch("/account?userId=" + encodeURIComponent($("q_user").value))).json(), null, 2); }
-async function loadWorld() { $("world_out").textContent = JSON.stringify(await (await fetch("/world")).json(), null, 2); }
-async function runTick() { await api("POST", "/tick", {}, { "x-tick-secret": $("tick_secret").value }); loadWorld(); }
-loadWorld();
+function switchUser(){ state.user=$("user").value.trim()||"me"; loadAccount(); }
+
+// ---- world clock ----
+async function loadWorld(){ const w=await (await fetch("/world")).json(); if(w&&w.currentTick!=null) $("clock").textContent="tick "+w.currentTick+" · 처리 "+w.lastProcessedTick; }
+
+// ---- issuer tools ----
+async function tCreateAccount(){ await api("POST","/accounts",{userId:$("t_acc_id").value,currency:"USD",grantCash:$("t_acc_cash").value}); toast("계정 생성"); if($("t_acc_id").value===state.user) loadAccount(); }
+async function tIssueEquity(){ await api("POST","/issue/equity",{id:$("t_eq_id").value,ticker:$("t_eq_tk").value,issuerUserId:state.user,currency:"USD",sharesOutstanding:$("t_eq_sh").value}); toast("발행 완료"); loadSecurities(); loadAccount(); }
+async function tLiquidity(){ await api("POST","/pools/liquidity",{securityId:$("t_lp_id").value,providerId:state.user,baseIn:$("t_lp_b").value,quoteIn:$("t_lp_q").value}); toast("유동성 예치"); loadSecurities(); loadAccount(); }
+async function tIssueBond(){ await api("POST","/issue/bond",{id:$("t_bd_id").value,ticker:$("t_bd_tk").value,issuerUserId:state.user,currency:"USD",faceValue:$("t_bd_face").value,couponRate:$("t_bd_rate").value,maturityTick:Number($("t_bd_mat").value),couponIntervalTicks:Number($("t_bd_ci").value),unitsIssued:$("t_bd_u").value}); toast("채권 발행"); loadSecurities(); }
+async function tIssueEtf(){ const c=$("t_etf_c").value.split(",").map(s=>s.trim()).filter(Boolean).map(p=>{const[id,u]=p.split(":");return{securityId:id.trim(),unitsPerShare:(u||"1").trim()};}); await api("POST","/issue/etf",{id:$("t_etf_id").value,ticker:$("t_etf_tk").value,issuerUserId:state.user,currency:"USD",constituents:c}); toast("ETF 발행"); loadSecurities(); }
+async function tDividend(){ await api("POST","/actions/dividend",{securityId:$("t_dv_id").value,issuerId:state.user,perShare:$("t_dv_ps").value}); toast("배당 지급"); loadAccount(); }
+async function tSplit(){ await api("POST","/actions/split",{securityId:$("t_sp_id").value,issuerId:state.user,ratio:Number($("t_sp_r").value)}); toast("분할 완료"); loadSecurities(); selectSecurity(state.selected); loadAccount(); }
+async function tTick(){ await api("POST","/tick",{},{"x-tick-secret":$("t_tick_secret").value}); loadWorld(); }
+
+// ---- boot + live refresh ----
+async function boot(){ await loadSecurities(); await loadAccount(); await loadWorld(); }
+boot();
+setInterval(async ()=>{ if(state.selected){ const m=await (await fetch("/market?securityId="+encodeURIComponent(state.selected)).catch(()=>null))?.json?.(); if(m){ state.market=m; const s=state.sec; const last=lastPrice(m),chg=changePct(m);
+  $("d_price").textContent=last==null?"—":pxToDisplay(last,s.currency); drawSpark(m); drawBook(m,s); } } loadWorld(); }, 6000);
 </script>
 </body>
 </html>
