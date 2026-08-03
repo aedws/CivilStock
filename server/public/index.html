@@ -85,11 +85,19 @@
   .dtabs button{background:none;color:var(--muted);padding:.5rem 0;font-weight:600;border-bottom:2px solid transparent}
   .dtabs button.on{color:var(--text);border-bottom-color:var(--accent)}
   svg.chart{width:100%;height:150px;display:block}
-  .book{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;padding:.5rem 1rem 1rem}
-  .book .col{display:flex;flex-direction:column;gap:2px}
-  .book .lvl{display:flex;justify-content:space-between;padding:.2rem .5rem;border-radius:6px;font-size:.82rem}
-  .book .ask{background:color-mix(in srgb,var(--down) 12%,transparent)}
-  .book .bid{background:color-mix(in srgb,var(--up) 12%,transparent)}
+  .obook{padding:.4rem 1rem 1rem;display:flex;flex-direction:column;gap:1px}
+  .orow{display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:.18rem .5rem}
+  .orow .op{font-weight:600;font-variant-numeric:tabular-nums} .orow.ask .op{color:var(--down)} .orow.bid .op{color:var(--up)}
+  .oq{position:relative;height:1.35rem;display:flex;align-items:center;justify-content:flex-end}
+  .obar{position:absolute;top:2px;bottom:2px;right:0;border-radius:3px;opacity:.20}
+  .obar.ask{background:var(--down)} .obar.bid{background:var(--up)}
+  .oqn{position:relative;z-index:1;color:var(--muted);font-size:.78rem;font-variant-numeric:tabular-nums}
+  .bookmid{text-align:center;font-weight:800;padding:.4rem;font-size:1.05rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:.25rem 0;font-variant-numeric:tabular-nums}
+  .stp{width:2rem;height:2.1rem;flex:0 0 auto;background:var(--panel2);color:var(--text);font-size:1rem;font-weight:700}
+  .fieldrow input{flex:1}
+  .avail{display:flex;justify-content:space-between;font-size:.8rem;padding:.1rem 0}
+  .pos{display:flex;justify-content:space-between;padding:.55rem 1rem;border-top:1px solid var(--border)} .pos .r{text-align:right}
+  .pos .pnl{font-size:.78rem}
   .trlist{padding:.3rem 1rem 1rem;font-size:.82rem}
   .trlist .tr{display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid var(--border)}
 
@@ -162,7 +170,7 @@
         <button id="dt_book" onclick="setDetTab('book')">호가</button>
         <button id="dt_trades" onclick="setDetTab('trades')">체결</button></div>
       <div id="pane_chart"><div class="tf" id="tf"></div><svg class="chart" id="chart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg><div class="chartinfo" id="chartinfo"></div></div>
-      <div id="pane_book" style="display:none"><div class="book"><div class="col" id="asks"></div><div class="col" id="bids"></div></div></div>
+      <div id="pane_book" style="display:none"><div class="obook" id="obook"></div></div>
       <div id="pane_trades" style="display:none"><div class="trlist" id="trades"></div></div>
 
       <div class="tabs">
@@ -172,10 +180,13 @@
       <div class="ticket">
         <div class="seg"><button id="seg_limit" class="on" onclick="setType('limit')">지정가</button>
           <button id="seg_market" onclick="setType('market')">시장가</button></div>
-        <div class="fieldrow" id="pricerow"><label>가격</label><input id="o_price" class="num" /></div>
-        <div class="fieldrow"><label>수량</label><input id="o_qty" class="num" value="1" oninput="calcTotal()" /></div>
+        <div class="fieldrow" id="pricerow"><label>가격</label>
+          <button class="stp" onclick="stepPrice(-1)">−</button><input id="o_price" class="num" oninput="calcTotal()" /><button class="stp" onclick="stepPrice(1)">+</button></div>
+        <div class="fieldrow"><label>수량</label>
+          <button class="stp" onclick="stepQty(-1)">−</button><input id="o_qty" class="num" value="1" oninput="calcTotal()" /><button class="stp" onclick="stepQty(1)">+</button></div>
         <div class="quick"><button onclick="qpct(.1)">10%</button><button onclick="qpct(.25)">25%</button>
           <button onclick="qpct(.5)">50%</button><button onclick="qpct(1)">최대</button></div>
+        <div class="avail"><span class="muted" id="o_availlabel">주문가능</span><span class="num muted" id="o_avail">—</span></div>
         <div class="total"><span class="muted">총 주문금액</span><span class="num" id="o_total">—</span></div>
         <button class="submit buy" id="submit" onclick="submitOrder()">구매하기</button>
       </div>
@@ -430,10 +441,21 @@ function drawChart(m){
   $("chartinfo").innerHTML=`<span class="up">고 ${money(max,state.sec.currency)}</span><span class="down">저 ${money(min,state.sec.currency)}</span><span class="${curCol}">현재 ${money(cur,state.sec.currency)}</span><span class="muted">MA5</span>`;
 }
 function drawBook(m,s){
-  const asks=(m.asks||[]).slice().reverse(), bids=(m.bids||[]);
-  $("asks").innerHTML=asks.map(a=>`<div class="lvl ask"><span class="down num">${money(a.price,s.currency)}</span><span class="muted num">${a.quantity}</span></div>`).join("")||`<div class="lvl muted">매도호가 없음</div>`;
-  $("bids").innerHTML=bids.map(b=>`<div class="lvl bid"><span class="up num">${money(b.price,s.currency)}</span><span class="muted num">${b.quantity}</span></div>`).join("")||`<div class="lvl muted">매수호가 없음</div>`;
+  const spot=Number(lastPrice(m)||m.ammSpot||0);
+  let asks=(m.asks||[]).map(a=>({price:Number(a.price),qty:Number(a.quantity)}));
+  let bids=(m.bids||[]).map(b=>({price:Number(b.price),qty:Number(b.quantity)}));
+  if(m.pool && spot>0){ const depth=Math.max(1,Number(m.pool.reserveBase)*0.02);
+    for(let i=1;i<=5;i++){ if(asks.length<5) asks.push({price:Math.max(1,Math.round(spot*(1+i*0.004))),qty:+(depth*i).toFixed(2)}); if(bids.length<5) bids.push({price:Math.max(1,Math.round(spot*(1-i*0.004))),qty:+(depth*i).toFixed(2)}); } }
+  asks.sort((a,b)=>a.price-b.price); bids.sort((a,b)=>b.price-a.price); asks=asks.slice(0,6); bids=bids.slice(0,6);
+  const maxq=Math.max(1,...asks.map(a=>a.qty),...bids.map(b=>b.qty));
+  const lvl=(x,cls)=>`<div class="orow ${cls}" onclick="setPriceFromBook(${x.price})"><span class="op">${money(x.price,s.currency)}</span><span class="oq"><span class="obar ${cls}" style="width:${Math.round(x.qty/maxq*100)}%"></span><span class="oqn">${x.qty}</span></span></div>`;
+  const askHtml=asks.slice().reverse().map(a=>lvl(a,"ask")).join("")||`<div class="orow muted" style="grid-template-columns:1fr">매도호가 없음</div>`;
+  const bidHtml=bids.map(b=>lvl(b,"bid")).join("")||`<div class="orow muted" style="grid-template-columns:1fr">매수호가 없음</div>`;
+  $("obook").innerHTML=askHtml+`<div class="bookmid">${money(Math.round(spot),s.currency)}</div>`+bidHtml;
 }
+function setPriceFromBook(p){ setType("limit"); $("o_price").value=p; calcTotal(); }
+function stepPrice(d){ const cur=Number($("o_price").value||lastPrice(state.market)||0); const step=Math.max(1,Math.round(cur*0.001)); $("o_price").value=Math.max(0,cur+d*step); calcTotal(); }
+function stepQty(d){ const cur=Number($("o_qty").value||0); $("o_qty").value=Math.max(0,+(cur+d).toFixed(6)); calcTotal(); }
 function drawTrades(m,s){
   const t=(m.trades||[]).slice(0,20);
   $("trades").innerHTML=t.length? t.map(x=>{ const c=x.taker_side==="buy"?"up":"down"; return `<div class="tr"><span class="${c} num">${money(x.price,s.currency)}</span><span class="muted num">${x.quantity}</span><span class="muted">${x.source}</span></div>`; }).join("") : `<div class="tr muted">체결 없음</div>`;
@@ -442,8 +464,15 @@ function drawTrades(m,s){
 // ---- order ticket ----
 function setSide(sd){ state.side=sd; $("tab_buy").className="buy"+(sd==="buy"?" on":""); $("tab_sell").className="sell"+(sd==="sell"?" on":""); const b=$("submit"); b.className="submit "+sd; b.textContent=sd==="buy"?"구매하기":"판매하기"; calcTotal(); }
 function setType(t){ state.otype=t; $("seg_limit").className=t==="limit"?"on":""; $("seg_market").className=t==="market"?"on":""; $("pricerow").style.display=t==="market"?"none":"flex"; calcTotal(); }
-function calcTotal(){ const price=state.otype==="market"?Number(lastPrice(state.market)||0):Number($("o_price").value||0); const qty=Number($("o_qty").value||0); const cur=state.sec?state.sec.currency:"USD"; $("o_total").textContent=money(Math.round(price*qty),cur); }
-function accountCash(){ const cur=state.sec?state.sec.currency:"USD"; const c=state.account&&state.account.cash&&state.account.cash.find(x=>x.currency===cur); return c?Number(c.balance)/100:0; }
+function calcTotal(){
+  const price=state.otype==="market"?Number(lastPrice(state.market)||0):Number($("o_price").value||0);
+  const qty=Number($("o_qty").value||0); const cur=state.sec?state.sec.currency:"USD";
+  $("o_total").textContent=money(Math.round(price*qty),cur);
+  if(state.side==="buy"){ $("o_availlabel").textContent="주문가능 현금"; $("o_avail").textContent=money(accountCashMinor(),cur); }
+  else { $("o_availlabel").textContent="주문가능 수량"; $("o_avail").textContent=accountPos(state.selected)+"주"; }
+}
+function accountCashMinor(){ const cur=state.sec?state.sec.currency:"USD"; const c=state.account&&state.account.cash&&state.account.cash.find(x=>x.currency===cur); return c?c.balance:"0"; }
+function accountCash(){ return Number(accountCashMinor())/100; }
 function accountPos(id){ const p=state.account&&state.account.positions&&state.account.positions.find(x=>x.security_id===id); return p?Number(p.quantity):0; }
 function qpct(f){ const price=Number($("o_price").value||lastPrice(state.market)||0); if(state.side==="buy"){ if(price>0) $("o_qty").value=Math.floor((accountCash()/price)*f*1e6)/1e6; } else { $("o_qty").value=Math.floor(accountPos(state.selected)*f*1e6)/1e6; } calcTotal(); }
 async function submitOrder(){
@@ -460,11 +489,20 @@ async function loadAccount(){
   state.account=a;
   const cur=state.nationInfo?state.nationInfo.currency:(state.sec?state.sec.currency:"USD");
   const cashRow=(a.cash||[]).find(c=>c.currency===cur)||(a.cash||[])[0];
-  $("p_cur").textContent=(cashRow?cashRow.currency:cur)+" 현금";
-  $("p_net").textContent=cashRow?money(cashRow.balance,cashRow.currency):money(0,cur);
-  const byId=Object.fromEntries(state.securities.map(s=>[s.id,s]));
-  $("p_positions").innerHTML=(a.positions||[]).length?(a.positions||[]).map(p=>{ const s=byId[p.security_id]; const tk=s?s.ticker:p.security_id;
-    return `<div class="pos"><div><b>${tk}</b> <span class="muted num">${p.quantity}</span></div><div class="r"><button style="background:var(--panel2);color:var(--text);padding:.25rem .6rem" onclick="selectSecurity('${p.security_id}')">거래</button></div></div>`; }).join(""):`<div class="pos muted">보유 종목 없음</div>`;
+  const cashMinor=cashRow?Number(cashRow.balance):0;
+  let holdVal=0, holdCost=0;
+  const rows=(a.positions||[]).map(p=>{ const qty=Number(p.quantity),price=Number(p.price||0),avg=Number(p.avg_cost||0);
+    const val=qty*price, cost=qty*avg; holdVal+=val; holdCost+=cost; const pnl=val-cost, pnlp=cost>0?pnl/cost*100:0; return {p,qty,val,pnl,pnlp}; });
+  const net=cashMinor+holdVal, totalPnl=holdVal-holdCost, totalPnlp=holdCost>0?totalPnl/holdCost*100:0;
+  const pc=totalPnl>0?"up":totalPnl<0?"down":"muted";
+  $("p_cur").textContent=(cashRow?cashRow.currency:cur)+" 총 평가자산";
+  $("p_net").textContent=money(Math.round(net),cur);
+  let html=`<div class="pos"><div class="muted">현금</div><div class="r num">${money(Math.round(cashMinor),cur)}</div></div>`;
+  if(rows.length) html+=`<div class="pos"><div class="muted">평가손익</div><div class="r num ${pc}">${totalPnl>=0?"+":""}${money(Math.round(totalPnl),cur)} (${totalPnlp.toFixed(2)}%)</div></div>`;
+  html+= rows.length? rows.map(({p,qty,val,pnl,pnlp})=>{ const s=(state.securities||[]).find(x=>x.id===p.security_id); const tk=p.ticker||(s?s.ticker:p.security_id); const c=pnl>0?"up":pnl<0?"down":"muted";
+      return `<div class="pos" style="cursor:pointer" onclick="selectSecurity('${p.security_id}')"><div><b>${tk}</b> <span class="muted num">${qty}</span><div class="pnl num ${c}">${pnl>=0?"+":""}${money(Math.round(pnl),p.currency)} (${pnlp.toFixed(2)}%)</div></div><div class="r num">${money(Math.round(val),p.currency)}</div></div>`;
+    }).join("") : `<div class="pos muted">보유 종목 없음</div>`;
+  $("p_positions").innerHTML=html;
 }
 function switchUser(){ state.user=$("user").value.trim()||"me"; if(state.view==="nation") loadAccount(); }
 async function loadWorld(){ const w=await (await fetch("/world")).json(); if(w&&w.currentTick!=null) $("clock").textContent="tick "+w.currentTick; }
