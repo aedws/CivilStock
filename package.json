@@ -7,7 +7,8 @@
   "scripts": {
     "test:exact-amount": "tsx scripts/test-exact-amount.ts",
     "test:economy": "tsx scripts/test-economy.ts",
-    "test": "npm run test:exact-amount && npm run test:economy",
+    "test:amm": "tsx scripts/test-amm.ts",
+    "test": "npm run test:exact-amount && npm run test:economy && npm run test:amm",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

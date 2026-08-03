@@ -19,7 +19,9 @@ export type SecurityType =
   | "etf" // 유저가 구성한 바스켓
   | "adr" // 타 시장 상장 증권의 예탁증서(교차 상장)
   | "currency" // 국가 통화(FX)
-  | "commodity"; // 실물 자원/재화
+  | "commodity" // 실물 자원/재화
+  | "option" // 파생: 옵션
+  | "future"; // 파생: 선물/무기한
 
 export type Side = "buy" | "sell";
 
@@ -82,6 +84,45 @@ export interface AdrDetails {
   ratio: string;
   /** 예탁기관(유저/기관). 홈 주식을 보관하고 ADR을 발행·상환. */
   depositaryUserId: string;
+}
+
+/** 옵션 상세: 기초자산·행사가·만기·계약규모. */
+export interface OptionDetails {
+  securityId: string;
+  underlyingSecurityId: string;
+  kind: "call" | "put";
+  /** 행사가(기초 1.0단위당 결제통화 최소단위, 정수 문자열). */
+  strike: ExactAmount;
+  /** 만기 틱(worldTick 번호). */
+  expiryTick: number;
+  /** 1계약당 기초자산 수량(6dp micros 문자열). */
+  contractSize: string;
+  settlement: "physical" | "cash";
+}
+
+/** 선물/무기한 상세: 기초자산·만기·증거금률. */
+export interface FutureDetails {
+  securityId: string;
+  underlyingSecurityId: string;
+  /** 만기 틱. 무기한(perp)이면 null. */
+  expiryTick: number | null;
+  /** 1계약당 기초자산 수량(6dp micros 문자열). */
+  contractSize: string;
+  /** 개시증거금률(bps). 예: 1000 = 10%. */
+  initialMarginBps: number;
+  /** 유지증거금률(bps). 이하로 내려가면 청산. */
+  maintenanceMarginBps: number;
+}
+
+/**
+ * 공매도/파생을 위한 증거금 요구. 정산 엔진(다음 슬라이스)이 계정 순자산 대비
+ * 유지증거금을 초과하는 손실을 강제청산한다. 현재는 스키마·불변식만 정의.
+ */
+export interface MarginRequirement {
+  /** 이 포지션이 요구하는 증거금(정수 최소단위 문자열). */
+  required: ExactAmount;
+  /** 예치된 담보(정수 최소단위 문자열). */
+  posted: ExactAmount;
 }
 
 /** 지정가 주문. 시장가는 limitPrice를 극단값으로 두는 상위 계층에서 처리. */
