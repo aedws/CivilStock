@@ -134,6 +134,83 @@ export interface RemoveResult {
   quoteOut: ExactAmount;
 }
 
+/** 정수 제곱근(내림). Newton 반복. */
+function isqrt(value: bigint): bigint {
+  if (value < 0n) throw new RangeError("isqrt of negative");
+  if (value < 2n) return value;
+  let x0 = value;
+  let x1 = (value >> 1n) + 1n;
+  while (x1 < x0) {
+    x0 = x1;
+    x1 = (x0 + value / x0) >> 1n;
+  }
+  return x0;
+}
+
+function ceilDiv(a: bigint, b: bigint): bigint {
+  return (a + b - 1n) / b;
+}
+
+/**
+ * 원하는 기초자산 산출량(baseOut)을 얻기 위해 필요한 결제통화 입력량(역스왑).
+ * 반올림은 올림(풀에 유리). 풀을 비울 순 없다(baseOut < reserveBase).
+ */
+export function quoteInForBaseOut(pool: AmmPool, baseOut: string): { quoteIn: ExactAmount; pool: AmmPool } {
+  const x = minor(pool.reserveQuote);
+  const y = micros(pool.reserveBase);
+  const dy = micros(baseOut);
+  if (dy <= 0n) return { quoteIn: "0", pool };
+  if (dy >= y) throw new RangeError("baseOut drains the pool");
+  const inAfterFee = ceilDiv(dy * x, y - dy);
+  const dx = ceilDiv(inAfterFee * BPS, BPS - BigInt(pool.feeBps));
+  return {
+    quoteIn: dx.toString(),
+    pool: { ...pool, reserveQuote: (x + dx).toString(), reserveBase: fromMicros(y - dy) },
+  };
+}
+
+/** 원하는 결제통화 산출량(quoteOut)을 얻기 위해 필요한 기초자산 입력량(역스왑). */
+export function baseInForQuoteOut(pool: AmmPool, quoteOut: ExactAmount): { baseIn: string; pool: AmmPool } {
+  const x = minor(pool.reserveQuote);
+  const y = micros(pool.reserveBase);
+  const dy = minor(quoteOut);
+  if (dy <= 0n) return { baseIn: "0", pool };
+  if (dy >= x) throw new RangeError("quoteOut drains the pool");
+  const inAfterFee = ceilDiv(dy * y, x - dy);
+  const dxBase = ceilDiv(inAfterFee * BPS, BPS - BigInt(pool.feeBps));
+  return {
+    baseIn: fromMicros(dxBase),
+    pool: { ...pool, reserveBase: fromMicros(y + dxBase), reserveQuote: (x - dy).toString() },
+  };
+}
+
+/**
+ * 현물가가 targetPrice에 도달하기 전까지 매수 가능한 기초자산 최대량(6dp 문자열).
+ * 수수료를 무시한 임계 추정(라우팅 분기용). 실제 체결은 fee 포함 역스왑으로 정확히.
+ */
+export function maxBaseBuyableToPrice(pool: AmmPool, targetPrice: ExactAmount): string {
+  const x = minor(pool.reserveQuote);
+  const y = micros(pool.reserveBase);
+  const k = x * y;
+  const target = BigInt(normalizeExactAmount(targetPrice));
+  const xTarget = isqrt((target * k) / MICRO);
+  if (xTarget <= x) return "0";
+  const yTarget = k / xTarget;
+  return fromMicros(y - yTarget);
+}
+
+/** 현물가가 targetPrice로 내려가기 전까지 매도 가능한 기초자산 최대량(6dp 문자열). */
+export function maxBaseSellableToPrice(pool: AmmPool, targetPrice: ExactAmount): string {
+  const x = minor(pool.reserveQuote);
+  const y = micros(pool.reserveBase);
+  const k = x * y;
+  const target = BigInt(normalizeExactAmount(targetPrice));
+  const xTarget = isqrt((target * k) / MICRO);
+  if (xTarget >= x) return "0";
+  const yTarget = k / xTarget;
+  return fromMicros(yTarget - y);
+}
+
 /** LP 지분을 소각하고 준비금을 비례 인출한다. */
 export function removeLiquidity(pool: AmmPool, shares: string): RemoveResult {
   const burn = micros(shares);

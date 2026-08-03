@@ -60,13 +60,13 @@ export function setPosition(
   state.positions.set(userId, bySecurity);
 }
 
-function quantityCompare(a: string, b: string): -1 | 0 | 1 {
+export function quantityCompare(a: string, b: string): -1 | 0 | 1 {
   const av = decimalToScaledInteger(normalizeExactQuantity(a), 6);
   const bv = decimalToScaledInteger(normalizeExactQuantity(b), 6);
   return av < bv ? -1 : av > bv ? 1 : 0;
 }
 
-function quantityAdd(a: string, b: string): string {
+export function quantityAdd(a: string, b: string): string {
   const sum =
     decimalToScaledInteger(normalizeExactQuantity(a), 6) +
     decimalToScaledInteger(normalizeExactQuantity(b), 6);

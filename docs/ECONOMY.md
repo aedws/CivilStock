@@ -46,12 +46,18 @@
 모든 상품은 공통 헤더(`Security`) + 종류별 detail 레코드로 구성. 매칭·정산 코어는
 상품 종류에 무관하게 동작한다(어떤 상품이든 호가장 + 원장으로 거래).
 
-## 3. 발행(issuance) — 발행권 이양의 핵심
+## 3. 발행(issuance) — 발행권 이양의 핵심 (구현 완료: 순수 코어)
 
-- **회사 설립 → 주식 발행(IPO)**: 유저가 발행주식수·공모가·통화를 정해 상장.
-  이후 증자(secondary), 자사주 매입, 액면분할, 배당을 발행자가 통제.
-- **ETF 발행**: 구성종목·비중 정의 → 생성/상환.
-- **채권 발행**: 원금·표면금리·만기 정의 → 시장에서 소화.
+발행 ≠ 판매를 분리한다. 발행은 상품 레코드 생성 + 발행자 포지션 크레딧이고,
+이후 매도·유동성 공급은 CLOB/AMM/라우터가 담당. 파일: `src/lib/economy/issuance.ts`.
+
+- **회사 설립 → 주식 발행(IPO)**: `issueEquity`가 발행주식수·통화로 상장하고
+  발행자에게 전량 크레딧. `issueSecondary`로 증자. (자사주·분할·배당은 확장.)
+- **ETF 발행**: `issueEtf`로 구성종목·비중 정의. `etfNav`로 시세 기반 순자산가치,
+  `createEtfShares`/`redeemEtfShares`로 바스켓↔ETF 생성·상환(포지션 원자 이동).
+- **채권 발행**: `issueBond`로 원금·표면금리·만기·쿠폰주기 정의. `bondCouponPerUnit`이
+  1좌·1주기 쿠폰액 계산(연율 → 틱 환산). 1차 판매는 원장 체결로.
+- **옵션 발행**: `issueOption`으로 상품 생성(행사·증거금은 파생 엔진 다음 슬라이스).
 - **스팸/사기 방지(발행은 자유롭되)**:
   - 국가 거래소별 **상장 규정**(최소 자본·공시 의무)을 국가 운영 유저가 설정.
   - **평판/공시**: 발행자 신뢰도, 허위공시 페널티.
@@ -71,8 +77,12 @@
   가격과 **동일 단위**(기초 1.0단위당 결제통화 최소단위)라 두 시장을 나란히
   비교·차익거래할 수 있다. 파일: `src/lib/economy/amm.ts`
   (`swapQuoteForBase`, `swapBaseForQuote`, `addLiquidity`, `removeLiquidity`).
-- **라우팅(다음 슬라이스)**: 테이커 주문을 CLOB 최우선호가와 AMM 현물가 중 유리한
-  쪽으로 보내는 스마트 라우터. 두 시장의 가격이 벌어지면 차익거래가 수렴시킨다.
+- **스마트 라우터(구현 완료).** `routeBuy`/`routeSell`이 저렴/유리한 소스부터
+  소진한다: AMM 현물가가 다음 CLOB 호가보다 유리하면 그 호가 수준까지 AMM에서
+  담고, 그 다음 CLOB 호가를 소진 — 반복. AMM 임계 물량은 수수료 무시 추정이나
+  실제 체결은 fee 포함 역스왑으로 정확해 가치 유출이 없다. 한도가(limit) 지원,
+  풀 없는 순수 CLOB도 동작. 파일: `src/lib/economy/router.ts`.
+  최선체결 검증: 동일 수량을 단일 소스로 채울 때보다 총비용↓/총수취↑(테스트).
 
 ## 5. 정산(settlement) — 원장과 불변식 (구현 완료: 순수 코어)
 
@@ -136,14 +146,16 @@ MVP에 **공매도 + 파생(옵션·선물) 모두 포함**으로 확정(2026-08
 
 - `src/lib/economy/types.ts` — 상품·주문·체결·파생·증거금 도메인 타입.
 - `src/lib/economy/orderBook.ts` — 가격-시간 우선 CLOB 매칭(순수).
-- `src/lib/economy/amm.ts` — 상수곱 AMM 스왑·유동성(순수).
+- `src/lib/economy/amm.ts` — 상수곱 AMM 스왑·유동성·역스왑·가격임계(순수).
+- `src/lib/economy/router.ts` — CLOB+AMM 스마트 라우터 최선체결(순수).
 - `src/lib/economy/ledger.ts` — 현금·포지션 원장 + 정산 불변식(순수).
-- `scripts/test-economy.ts`, `scripts/test-amm.ts` — 매칭·정산·스왑·큰 수 불변식(통과).
-- 실행: `npm run test`(전체) / `test:economy` / `test:amm`, 타입: `npm run typecheck`.
+- `src/lib/economy/issuance.ts` — 주식·ETF·채권·옵션 발행 + NAV·쿠폰·생성/상환(순수).
+- `scripts/test-*.ts` — economy·amm·router·issuance 스위트 전부 통과.
+- 실행: `npm run test`(전체), 타입: `npm run typecheck`.
 
 ### 다음 슬라이스(미구현, 설계만)
 
-- CLOB↔AMM 스마트 라우터(최선체결).
 - 증거금·마크투마켓·강제청산 엔진(공매도·선물).
 - 옵션 만기 정산·행사.
 - worldTick 연동(쿠폰 지급·마크투마켓·ETF NAV·실물경제 생산 흐름).
+- 발행 스팸/사기 방지(거래소 상장 규정·공시·평판).
