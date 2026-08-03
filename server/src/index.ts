@@ -95,12 +95,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (method === "POST" && p === "/issue/bond") {
       const b = await readJson(req);
-      return send(res, 200, await issueBond({ id: str(b, "id"), ticker: str(b, "ticker"), issuerUserId: str(b, "issuerUserId"), currency: str(b, "currency"), faceValue: str(b, "faceValue"), couponRate: str(b, "couponRate"), maturityTick: Number(b.maturityTick), couponIntervalTicks: Number(b.couponIntervalTicks), unitsIssued: str(b, "unitsIssued") }));
+      return send(res, 200, await issueBond({ id: str(b, "id"), ticker: str(b, "ticker"), issuerUserId: str(b, "issuerUserId"), currency: str(b, "currency"), nationId: optStr(b, "nationId") ?? null, faceValue: str(b, "faceValue"), couponRate: str(b, "couponRate"), maturityTick: Number(b.maturityTick), couponIntervalTicks: Number(b.couponIntervalTicks), unitsIssued: str(b, "unitsIssued") }));
     }
     if (method === "POST" && p === "/issue/etf") {
       const b = await readJson(req);
       const constituents = Array.isArray(b.constituents) ? (b.constituents as Array<{ securityId: string; unitsPerShare: string }>) : [];
-      return send(res, 200, await issueEtf({ id: str(b, "id"), ticker: str(b, "ticker"), issuerUserId: str(b, "issuerUserId"), currency: str(b, "currency"), constituents }));
+      return send(res, 200, await issueEtf({ id: str(b, "id"), ticker: str(b, "ticker"), issuerUserId: str(b, "issuerUserId"), currency: str(b, "currency"), nationId: optStr(b, "nationId") ?? null, constituents }));
     }
     if (method === "POST" && p === "/pools/liquidity") {
       const b = await readJson(req);

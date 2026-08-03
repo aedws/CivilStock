@@ -55,11 +55,22 @@
   @media (max-width:1100px){main{grid-template-columns:1fr}}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius)}
   .card h2{font-size:.82rem;font-weight:600;color:var(--muted);margin:0;padding:.85rem 1rem .3rem;letter-spacing:.02em}
-  .mrow{display:grid;grid-template-columns:1.6rem 1fr auto auto;gap:.6rem;align-items:center;padding:.6rem 1rem;cursor:pointer;border-top:1px solid var(--border)}
+  .atabs{display:flex;gap:.15rem;padding:.55rem .7rem .3rem;border-bottom:1px solid var(--border);overflow-x:auto}
+  .atabs button{background:none;color:var(--muted);font-weight:700;font-size:.82rem;padding:.35rem .55rem;border-radius:8px;white-space:nowrap}
+  .atabs button.on{background:var(--panel2);color:var(--text)}
+  .mrow{display:grid;grid-template-columns:1.3rem 1fr 56px auto;gap:.5rem;align-items:center;padding:.55rem 1rem;cursor:pointer;border-top:1px solid var(--border)}
   .mrow:hover{background:var(--panel2)} .mrow.sel{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
-  .tk{font-weight:700} .tag{font-size:.68rem;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:.05rem .35rem;margin-left:.35rem}
-  .mrow .price{text-align:right;font-weight:600} .mrow .chg{text-align:right;min-width:4.2rem;font-size:.85rem}
-  .rk{color:var(--muted);text-align:center;font-size:.85rem}
+  .tk{font-weight:700} .tag{font-size:.66rem;color:var(--muted);background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:.05rem .3rem;margin-left:.3rem}
+  .mname .sub{font-size:.7rem;margin-top:.2rem;display:flex;align-items:center;gap:.4rem;color:var(--muted)}
+  .ssbar{display:inline-flex;width:42px;height:5px;border-radius:3px;overflow:hidden;background:var(--down)}
+  .ssbar i{display:block;height:100%;background:var(--up)}
+  .rowspark{width:56px;height:30px;display:block}
+  .mrow .price{text-align:right;font-weight:600} .mrow .chg{text-align:right;font-size:.8rem}
+  .mright{text-align:right}
+  .rk{color:var(--muted);text-align:center;font-size:.82rem}
+  .tf{display:flex;gap:.12rem;padding:.4rem 1rem .1rem;flex-wrap:wrap}
+  .tf button{background:none;color:var(--muted);font-size:.74rem;padding:.18rem .4rem;border-radius:6px}
+  .tf button.on{background:var(--panel2);color:var(--text)}
 
   .dhead{display:flex;align-items:baseline;gap:.7rem;padding:1rem 1rem .3rem;flex-wrap:wrap}
   .dhead .dtk{font-size:1.15rem;font-weight:800}
@@ -136,7 +147,7 @@
   </div>
   <main>
     <section class="card" style="overflow:hidden">
-      <h2>증시 · 종목</h2>
+      <div class="atabs" id="atabs"></div>
       <div id="mlist"></div>
     </section>
 
@@ -148,7 +159,7 @@
       <div class="dtabs"><button id="dt_chart" class="on" onclick="setDetTab('chart')">차트</button>
         <button id="dt_book" onclick="setDetTab('book')">호가</button>
         <button id="dt_trades" onclick="setDetTab('trades')">체결</button></div>
-      <div id="pane_chart"><svg class="chart" id="chart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg></div>
+      <div id="pane_chart"><div class="tf" id="tf"></div><svg class="chart" id="chart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg></div>
       <div id="pane_book" style="display:none"><div class="book"><div class="col" id="asks"></div><div class="col" id="bids"></div></div></div>
       <div id="pane_trades" style="display:none"><div class="trlist" id="trades"></div></div>
 
@@ -219,7 +230,7 @@
 
 <script>
 const $=(id)=>document.getElementById(id);
-const state={ user:"me", view:"home", nation:null, nationInfo:null, securities:[], selected:null, market:null, sec:null, side:"buy", otype:"limit", account:null, detTab:"chart", selTile:null };
+const state={ user:"me", view:"home", nation:null, nationInfo:null, securities:[], selected:null, market:null, sec:null, side:"buy", otype:"limit", account:null, detTab:"chart", selTile:null, assetTab:"all", tf:"m" };
 const sym=(c)=>c==="USD"?"$":(c?c+" ":"$");
 function money(minor,cur){ const n=Number(minor)/100; if(!isFinite(n)) return String(minor); return sym(cur)+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function bigMoney(minor,cur){ const n=Number(minor)/100; if(!isFinite(n)) return String(minor); if(n>=1e9) return sym(cur)+(n/1e9).toFixed(2)+"B"; if(n>=1e6) return sym(cur)+(n/1e6).toFixed(2)+"M"; if(n>=1e3) return sym(cur)+(n/1e3).toFixed(1)+"K"; return money(minor,cur); }
@@ -331,16 +342,39 @@ async function showNation(id){
 function clearDetail(){ $("d_tk").textContent="종목 없음"; $("d_type").textContent=""; $("d_price").textContent="—"; $("d_chg").textContent=""; $("d_stats").innerHTML=""; $("chart").innerHTML=""; }
 
 // ---- market list ----
+const ASSET_TABS=[{k:"all",l:"전체"},{k:"equity",l:"기업"},{k:"bond",l:"채권"},{k:"etf",l:"ETF"},{k:"deriv",l:"파생"}];
+const SECTOR={agri:"식품·외식",steel:"산업재",power:"에너지",chip:"반도체",bank:"금융",ship:"해운"};
+function sectorOf(s){ const m=/_([a-z]+)$/.exec(s.id||""); if(m&&SECTOR[m[1]]) return SECTOR[m[1]]; return s.type==="bond"?"채권":s.type==="etf"?"ETF":s.type==="option"||s.type==="future"?"파생":"기타"; }
+function matchTab(s){ const k=state.assetTab||"all"; if(k==="all") return true; if(k==="deriv") return s.type==="option"||s.type==="future"; return s.type===k; }
+function renderAssetTabs(){
+  $("atabs").innerHTML=ASSET_TABS.map(t=>{ const n=(state.securities||[]).filter(s=>{const k=t.k; if(k==="all")return true; if(k==="deriv")return s.type==="option"||s.type==="future"; return s.type===k;}).length;
+    return `<button class="${(state.assetTab||"all")===t.k?"on":""}" onclick="setAssetTab('${t.k}')">${t.l}${n?` <span class="muted">${n}</span>`:""}</button>`; }).join("");
+}
+function setAssetTab(k){ state.assetTab=k; renderAssetTabs(); renderMarketList(); }
+function rowSpark(m){
+  const t=(m&&m.trades)?[...m.trades].reverse().map(x=>Number(x.price)):[];
+  if(t.length<2) return `<svg class="rowspark"></svg>`;
+  const min=Math.min(...t),max=Math.max(...t),rng=(max-min)||1; const up=t[t.length-1]>=t[0];
+  const pts=t.map((p,i)=>`${(i/(t.length-1))*56},${28-((p-min)/rng)*24-2}`).join(" ");
+  return `<svg class="rowspark" viewBox="0 0 56 30" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up?getCss('--up'):getCss('--down')}" stroke-width="1.5"/></svg>`;
+}
+function volume(m){ return (m&&m.trades)?m.trades.reduce((a,x)=>a+Number(x.price||0)*Number(x.quantity||0),0):0; }
+function buyRatio(m){ if(!m||!m.trades||!m.trades.length) return 50; let b=0,s=0; for(const t of m.trades){ const q=Number(t.quantity||0); if(t.taker_side==="buy")b+=q; else s+=q; } const tot=b+s; return tot? Math.round(b/tot*100):50; }
 async function renderMarketList(){
+  renderAssetTabs();
   const rows=await Promise.all(state.securities.map(async s=>({s,m:await (await fetch("/market?securityId="+encodeURIComponent(s.id))).json()})));
+  const shown=rows.filter(({s})=>matchTab(s));
   const el=$("mlist"); el.innerHTML="";
-  if(!rows.length){ el.innerHTML=`<div class="mrow muted" style="cursor:default">아직 상장 종목이 없어요. 아래 운영 도구에서 발행하세요.</div>`; return; }
-  rows.forEach(({s,m},i)=>{
+  if(!shown.length){ el.innerHTML=`<div class="mrow muted" style="cursor:default;grid-template-columns:1fr">이 분류에 상장 종목이 없어요. 아래 운영 도구에서 발행하세요.</div>`; return; }
+  shown.forEach(({s,m},i)=>{
     const last=lastPrice(m), chg=changePct(m); const cls=chg>0?"up":chg<0?"down":"muted";
-    const div=document.createElement("div"); div.className="mrow"+(state.selected===s.id?" sel":""); div.onclick=()=>selectSecurity(s.id);
-    div.innerHTML=`<div class="rk">${i+1}</div><div><span class="tk">${s.ticker}</span><span class="tag">${s.type}</span></div>
-      <div class="price num">${last==null?"—":money(last,s.currency)}</div>
-      <div class="chg num ${cls}">${chg==null?"":(chg>0?"+":"")+chg.toFixed(2)+"%"}</div>`;
+    const br=buyRatio(m); const vol=volume(m);
+    const div=document.createElement("div"); div.className="mrow"+(state.selected===s.id?" sel":""); div.dataset.id=s.id; div.onclick=()=>selectSecurity(s.id);
+    div.innerHTML=`<div class="rk">${i+1}</div>
+      <div class="mname"><span class="tk">${s.ticker}</span><span class="tag">${sectorOf(s)}</span>
+        <div class="sub">${vol? "거래대금 "+bigMoney(vol,s.currency):"거래 없음"}<span class="ssbar"><i style="width:${br}%"></i></span></div></div>
+      ${rowSpark(m)}
+      <div class="mright"><div class="price num">${last==null?"—":money(last,s.currency)}</div><div class="chg num ${cls}">${chg==null?"":(chg>0?"+":"")+chg.toFixed(2)+"%"}</div></div>`;
     el.appendChild(div);
   });
 }
@@ -364,21 +398,26 @@ async function selectSecurity(id){
     <div class="s"><span class="k">발행주식</span><span class="num">${m.sharesOutstanding? Number(m.sharesOutstanding).toLocaleString():"—"}</span></div>
     <div class="s"><span class="k">발행자</span><span>${s.issuer_user_id||"—"}</span></div>
     <div class="s"><span class="k">유형</span><span>${s.type}</span></div>`;
-  drawChart(m); drawBook(m,s); drawTrades(m,s);
+  renderTf(); drawChart(m); drawBook(m,s); drawTrades(m,s);
   if(last!=null && document.activeElement!==$("o_price")) $("o_price").value=last;
   calcTotal();
-  document.querySelectorAll(".mrow").forEach((e,i)=>{ e.classList.toggle("sel", state.securities[i]&&state.securities[i].id===id); });
+  document.querySelectorAll(".mrow").forEach(e=>{ e.classList.toggle("sel", e.dataset.id===id); });
 }
 function setDetTab(t){ state.detTab=t; ["chart","book","trades"].forEach(x=>{ $("pane_"+x).style.display=x===t?"":"none"; $("dt_"+x).className=x===t?"on":""; }); }
+const TFS=[{k:"s",l:"30초",n:30},{k:"m",l:"1분",n:20},{k:"m5",l:"5분",n:12},{k:"d",l:"1일",n:8}];
+function renderTf(){ $("tf").innerHTML=TFS.map(t=>`<button class="${(state.tf||'m')===t.k?'on':''}" onclick="setTf('${t.k}')">${t.l}</button>`).join(""); }
+function setTf(k){ state.tf=k; renderTf(); if(state.market) drawChart(state.market); }
 function drawChart(m){
-  const svg=$("chart"); const t=(m&&m.trades)?[...m.trades].reverse():[];
-  if(t.length<2){ svg.innerHTML=`<text x="150" y="78" fill="${getCss('--muted')}" font-size="11" text-anchor="middle">체결 데이터 대기</text>`; return; }
-  const ps=t.map(x=>Number(x.price)); const min=Math.min(...ps),max=Math.max(...ps),rng=(max-min)||1;
-  const X=i=>(i/(ps.length-1))*300, Y=p=>142-((p-min)/rng)*132;
-  const line=ps.map((p,i)=>`${X(i)},${Y(p)}`).join(" ");
-  const up=ps[ps.length-1]>=ps[0]; const col=up?getCss("--up"):getCss("--down");
-  const area=`0,150 ${line} 300,150`;
-  svg.innerHTML=`<polygon points="${area}" fill="${col}" opacity="0.10"/><polyline points="${line}" fill="none" stroke="${col}" stroke-width="2"/>`;
+  const svg=$("chart"); const raw=(m&&m.trades)?[...m.trades].reverse().map(x=>Number(x.price)):[];
+  if(raw.length<2){ svg.innerHTML=`<text x="150" y="78" fill="${getCss('--muted')}" font-size="11" text-anchor="middle">체결 데이터 대기</text>`; return; }
+  const tf=TFS.find(x=>x.k===(state.tf||"m")); const N=Math.min(tf?tf.n:20, raw.length); const per=Math.ceil(raw.length/N);
+  const candles=[]; for(let i=0;i<raw.length;i+=per){ const g=raw.slice(i,i+per); candles.push({o:g[0],c:g[g.length-1],h:Math.max(...g),l:Math.min(...g)}); }
+  const min=Math.min(...candles.map(k=>k.l)),max=Math.max(...candles.map(k=>k.h)),rng=(max-min)||1;
+  const W=300,H=150,pad=8; const cw=W/candles.length; const Y=p=>H-pad-((p-min)/rng)*(H-2*pad);
+  svg.innerHTML=candles.map((k,i)=>{ const x=i*cw+cw/2; const up=k.c>=k.o; const col=up?getCss("--up"):getCss("--down");
+    const top=Y(Math.max(k.o,k.c)),bot=Y(Math.min(k.o,k.c)); const bw=Math.max(2,cw*0.62);
+    return `<line x1="${x.toFixed(1)}" y1="${Y(k.h).toFixed(1)}" x2="${x.toFixed(1)}" y2="${Y(k.l).toFixed(1)}" stroke="${col}" stroke-width="1" vector-effect="non-scaling-stroke"/><rect x="${(x-bw/2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bot-top).toFixed(1)}" fill="${col}"/>`;
+  }).join("");
 }
 function drawBook(m,s){
   const asks=(m.asks||[]).slice().reverse(), bids=(m.bids||[]);
