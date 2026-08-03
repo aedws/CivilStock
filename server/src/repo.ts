@@ -82,11 +82,28 @@ export async function insertNation(
 
 export async function listNations(client: Client): Promise<Array<Record<string, unknown>>> {
   const { rows } = await client.query(
-    `select n.id, n.name, n.currency, n.owner_user_id, count(s.id)::int as company_count
-       from nations n left join securities s on s.nation_id = n.id
+    `select n.id, n.name, n.currency, n.owner_user_id,
+            count(distinct s.id)::int as company_count,
+            coalesce(max(m.army), 0)::text as army
+       from nations n
+       left join securities s on s.nation_id = n.id
+       left join military m on m.nation_id = n.id
       group by n.id order by n.created_at`,
   );
   return rows;
+}
+
+export async function getArmy(client: Client, nationId: string): Promise<bigint> {
+  const { rows } = await client.query(`select army::text as army from military where nation_id = $1 for update`, [nationId]);
+  return BigInt((rows[0]?.army as string | undefined) ?? "0");
+}
+
+export async function setArmy(client: Client, nationId: string, army: bigint): Promise<void> {
+  await client.query(
+    `insert into military (nation_id, army) values ($1, $2)
+       on conflict (nation_id) do update set army = excluded.army`,
+    [nationId, army.toString()],
+  );
 }
 
 export async function getNation(client: Client, id: string): Promise<Record<string, unknown> | null> {

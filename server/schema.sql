@@ -147,6 +147,12 @@ create table if not exists territories (
 );
 create index if not exists territories_nation_idx on territories(nation_id);
 
+-- 군사: 국가별 병력 풀. 경제(현금)로 모집하고 전쟁에서 소모한다.
+create table if not exists military (
+  nation_id text primary key references nations(id),
+  army numeric not null default 0
+);
+
 -- 세계 시계: 기원점(epoch)과 틱 간격. 서버가 경과 시간으로 현재 tick을 산출한다.
 create table if not exists world (
   id int primary key default 1 check (id = 1),

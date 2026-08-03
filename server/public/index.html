@@ -258,24 +258,54 @@ function renderLegend(){
   const nats=(MAP&&MAP.nations)?MAP.nations:[];
   $("legend").innerHTML=nats.map(n=>`<span class="li"><span class="sw" style="background:hsl(${hueOf(n.id)} 55% 45%)"></span>${n.name}</span>`).join("");
 }
+function natById(id){ return (MAP.nations||[]).find(n=>n.id===id); }
+function myAdjacentNation(q,r){ return (MAP.nations||[]).filter(n=>n.owner_user_id===state.user).map(n=>n.id)
+  .find(nid=>neighbors(q,r).some(([nq,nr])=>{ const t=tileOwner(nq,nr); return t&&t.nation_id===nid; })); }
 function selectTile(q,r){
   state.selTile={q,r}; renderMap();
   const o=tileOwner(q,r); const panel=$("mappanel");
   if(o){
-    panel.innerHTML=`<h3><span style="color:hsl(${hueOf(o.nation_id)} 60% 60%)">■</span> ${o.nation_name}</h3>
-      <div class="muted">통치자 ${o.owner_user_id}</div><div class="muted">타일 (${q}, ${r})</div>
+    const nat=natById(o.nation_id); const army=nat?nat.army:"0"; const mine=o.owner_user_id===state.user;
+    let html=`<h3><span style="color:hsl(${hueOf(o.nation_id)} 60% 60%)">■</span> ${o.nation_name}</h3>
+      <div class="muted">통치자 ${o.owner_user_id} · 타일 (${q}, ${r})</div>
+      <div style="margin:.3rem 0">⚔ 병력 <b>${army}</b></div>
       <button class="p enter" onclick="showNation('${o.nation_id}')">입국 →</button>`;
+    if(mine){
+      html+=`<div class="muted" style="margin-top:.8rem">군대 모집 (병력 1 = $100)</div>
+        <input id="rc_units" value="20" placeholder="병력 수" />
+        <button class="p" style="background:var(--accent)" onclick="recruit('${o.nation_id}',${q},${r})">🪖 모집</button>`;
+    } else {
+      const adj=myAdjacentNation(q,r);
+      if(adj){ const myn=natById(adj); const defense=10+Number(army);
+        html+=`<div class="muted" style="margin-top:.8rem">⚔ 공격 — 방어력 <b>${defense}</b> (수비10 + 병력${army})</div>
+          <div class="muted">공격국 ${myn.name} · 내 병력 ${myn.army}</div>
+          <input id="atk_commit" value="${defense+1}" placeholder="투입 병력" />
+          <button class="p expand" onclick="attackTile(${q},${r},'${adj}')">⚔ 공격 (병력 소모)</button>`;
+      } else {
+        html+=`<div class="muted" style="margin-top:.6rem">공격하려면 인접한 내 영토가 필요합니다.</div>`;
+      }
+    }
+    panel.innerHTML=html;
   } else {
-    const mine=(MAP.nations||[]).filter(n=>n.owner_user_id===state.user).map(n=>n.id);
-    const adj=mine.find(nid=>neighbors(q,r).some(([nq,nr])=>{ const t=tileOwner(nq,nr); return t&&t.nation_id===nid; }));
+    const adj=myAdjacentNation(q,r);
     let html=`<h3>빈 타일 (${q}, ${r})</h3>`;
-    if(adj){ const nat=(MAP.nations||[]).find(n=>n.id===adj); html+=`<button class="p expand" onclick="expandTile(${q},${r},'${adj}')">🚩 ${nat.name} 영토로 확장</button>`; }
+    if(adj){ const nat=natById(adj); html+=`<button class="p expand" onclick="expandTile(${q},${r},'${adj}')">🚩 ${nat.name} 영토로 확장</button>`; }
     html+=`<div class="muted" style="margin-top:.7rem">여기에 새 국가 건국</div>
       <input id="mf_name" placeholder="국가 이름 (예: 아스트라)" />
       <input id="mf_cur" value="USD" placeholder="통화" />
       <button class="p found" onclick="foundHere(${q},${r})">🏛️ 건국 (초기 국고 지급)</button>`;
     panel.innerHTML=html;
   }
+}
+async function recruit(nationId,q,r){
+  const units=Number($("rc_units").value||"0");
+  const {ok,json}=await api("POST","/military/recruit",{nationId,ownerId:state.user,units});
+  if(ok){ toast("모집 완료 · 병력 "+json.army); await loadMap(); selectTile(q,r); }
+}
+async function attackTile(q,r,nationId){
+  const commit=Number($("atk_commit").value||"0");
+  const {ok,json}=await api("POST","/war/attack",{nationId,ownerId:state.user,q,r,commit});
+  if(ok){ toast(json.result==="captured"?"🚩 점령 성공!":"🛡 격퇴됨 (방어력 부족)"); await loadMap(); selectTile(q,r); }
 }
 async function foundHere(q,r){
   const name=$("mf_name").value.trim(); if(!name) return toast("국가 이름을 입력하세요");

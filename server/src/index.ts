@@ -12,6 +12,7 @@ import { createAccount, issueEquity, issueBond, issueEtf } from "./issue";
 import { declareDividend, splitShares } from "./actions";
 import { runDueTicks, getWorld } from "./tick";
 import { foundNation, claimTile } from "./nations";
+import { recruit, attack } from "./military";
 import { listSecurities, getAccount, getMarket, listNations, getNationDetail, getMap } from "./queries";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -75,6 +76,14 @@ const server = http.createServer(async (req, res) => {
     if (method === "POST" && p === "/map/claim") {
       const b = await readJson(req);
       return send(res, 200, await claimTile({ q: Number(b.q), r: Number(b.r), nationId: str(b, "nationId"), ownerId: str(b, "ownerId") }));
+    }
+    if (method === "POST" && p === "/military/recruit") {
+      const b = await readJson(req);
+      return send(res, 200, await recruit({ nationId: str(b, "nationId"), ownerId: str(b, "ownerId"), units: Number(b.units) }));
+    }
+    if (method === "POST" && p === "/war/attack") {
+      const b = await readJson(req);
+      return send(res, 200, await attack({ nationId: str(b, "nationId"), ownerId: str(b, "ownerId"), q: Number(b.q), r: Number(b.r), commit: Number(b.commit) }));
     }
     if (method === "POST" && p === "/accounts") {
       const b = await readJson(req);
