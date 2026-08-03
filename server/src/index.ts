@@ -1,19 +1,28 @@
 /**
- * CivilStock 권위 API 서버(Cloud Run). node:http 최소 라우터.
- *
- * 엔드포인트:
- *   GET  /healthz          — 헬스체크(Cloud Run 프로브).
- *   POST /orders           — 주문 접수(CLOB+AMM 최선체결·정산).
- *   POST /tick             — worldTick(Cloud Scheduler 전용, TICK_SECRET 인증).
+ * CivilStock 권위 API 서버(Cloud Run) + 최소 웹 UI. node:http 라우터.
  */
 import http from "node:http";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { config } from "./config";
-import { HttpError, placeOrder, runTick, type PlaceOrderInput } from "./handlers";
+import { HttpError } from "./errors";
+import { placeOrder, cancelOrder, provideLiquidity } from "./trade";
+import { createAccount, issueEquity, issueBond, issueEtf } from "./issue";
+import { runDueTicks, getWorld } from "./tick";
+import { listSecurities, getAccount, getMarket } from "./queries";
+
+const here = dirname(fileURLToPath(import.meta.url));
+let indexHtml = "";
+try {
+  indexHtml = readFileSync(join(here, "..", "public", "index.html"), "utf8");
+} catch {
+  indexHtml = "<h1>CivilStock</h1><p>UI not found.</p>";
+}
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
-  const payload = JSON.stringify(body);
   res.writeHead(status, { "content-type": "application/json" });
-  res.end(payload);
+  res.end(JSON.stringify(body));
 }
 
 async function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
@@ -27,45 +36,66 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
   }
 }
 
-function requireString(body: Record<string, unknown>, key: string): string {
-  const value = body[key];
-  if (typeof value !== "string" || value.length === 0) throw new HttpError(400, `missing field: ${key}`);
-  return value;
+function str(body: Record<string, unknown>, key: string): string {
+  const v = body[key];
+  if (typeof v !== "string" || v.length === 0) throw new HttpError(400, `missing field: ${key}`);
+  return v;
+}
+function optStr(body: Record<string, unknown>, key: string): string | undefined {
+  const v = body[key];
+  return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://localhost");
+    const p = url.pathname;
+    const method = req.method ?? "GET";
 
-    if (req.method === "GET" && url.pathname === "/healthz") {
-      return send(res, 200, { ok: true });
+    if (method === "GET" && p === "/") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      return res.end(indexHtml);
     }
+    if (method === "GET" && p === "/healthz") return send(res, 200, { ok: true });
+    if (method === "GET" && p === "/world") return send(res, 200, await getWorld());
+    if (method === "GET" && p === "/securities") return send(res, 200, await listSecurities());
+    if (method === "GET" && p === "/account") return send(res, 200, await getAccount(str(Object.fromEntries(url.searchParams), "userId")));
+    if (method === "GET" && p === "/market") return send(res, 200, await getMarket(str(Object.fromEntries(url.searchParams), "securityId")));
 
-    if (req.method === "POST" && url.pathname === "/orders") {
-      const body = await readJson(req);
-      const side = requireString(body, "side");
+    if (method === "POST" && p === "/accounts") {
+      const b = await readJson(req);
+      return send(res, 200, await createAccount({ userId: str(b, "userId"), handle: optStr(b, "handle"), grantCash: optStr(b, "grantCash"), currency: optStr(b, "currency") }));
+    }
+    if (method === "POST" && p === "/issue/equity") {
+      const b = await readJson(req);
+      return send(res, 200, await issueEquity({ id: str(b, "id"), ticker: str(b, "ticker"), issuerUserId: str(b, "issuerUserId"), currency: str(b, "currency"), nationId: optStr(b, "nationId") ?? null, exchangeId: optStr(b, "exchangeId") ?? null, sharesOutstanding: str(b, "sharesOutstanding") }));
+    }
+    if (method === "POST" && p === "/issue/bond") {
+      const b = await readJson(req);
+      return send(res, 200, await issueBond({ id: str(b, "id"), ticker: str(b, "ticker"), issuerUserId: str(b, "issuerUserId"), currency: str(b, "currency"), faceValue: str(b, "faceValue"), couponRate: str(b, "couponRate"), maturityTick: Number(b.maturityTick), couponIntervalTicks: Number(b.couponIntervalTicks), unitsIssued: str(b, "unitsIssued") }));
+    }
+    if (method === "POST" && p === "/issue/etf") {
+      const b = await readJson(req);
+      const constituents = Array.isArray(b.constituents) ? (b.constituents as Array<{ securityId: string; unitsPerShare: string }>) : [];
+      return send(res, 200, await issueEtf({ id: str(b, "id"), ticker: str(b, "ticker"), issuerUserId: str(b, "issuerUserId"), currency: str(b, "currency"), constituents }));
+    }
+    if (method === "POST" && p === "/pools/liquidity") {
+      const b = await readJson(req);
+      return send(res, 200, await provideLiquidity({ securityId: str(b, "securityId"), providerId: str(b, "providerId"), baseIn: str(b, "baseIn"), quoteIn: str(b, "quoteIn"), feeBps: typeof b.feeBps === "number" ? b.feeBps : undefined }));
+    }
+    if (method === "POST" && p === "/orders") {
+      const b = await readJson(req);
+      const side = str(b, "side");
       if (side !== "buy" && side !== "sell") throw new HttpError(400, "side must be buy|sell");
-      const input: PlaceOrderInput = {
-        orderId: requireString(body, "orderId"),
-        securityId: requireString(body, "securityId"),
-        ownerId: requireString(body, "ownerId"),
-        quantity: requireString(body, "quantity"),
-        side,
-        limitPrice: typeof body.limitPrice === "string" ? body.limitPrice : null,
-      };
-      const result = await placeOrder(input);
-      return send(res, 200, result);
+      return send(res, 200, await placeOrder({ orderId: str(b, "orderId"), securityId: str(b, "securityId"), ownerId: str(b, "ownerId"), quantity: str(b, "quantity"), side, limitPrice: optStr(b, "limitPrice") ?? null }));
     }
-
-    if (req.method === "POST" && url.pathname === "/tick") {
-      if (!config.tickSecret || req.headers["x-tick-secret"] !== config.tickSecret) {
-        throw new HttpError(401, "unauthorized");
-      }
-      const body = await readJson(req);
-      const tick = Number(body.tick);
-      if (!Number.isSafeInteger(tick) || tick < 0) throw new HttpError(400, "tick must be a non-negative integer");
-      const result = await runTick(tick);
-      return send(res, 200, result);
+    if (method === "POST" && p === "/orders/cancel") {
+      const b = await readJson(req);
+      return send(res, 200, await cancelOrder({ orderId: str(b, "orderId"), ownerId: optStr(b, "ownerId") }));
+    }
+    if (method === "POST" && p === "/tick") {
+      if (!config.tickSecret || req.headers["x-tick-secret"] !== config.tickSecret) throw new HttpError(401, "unauthorized");
+      return send(res, 200, await runDueTicks());
     }
 
     return send(res, 404, { error: "not found" });

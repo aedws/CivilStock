@@ -6,56 +6,47 @@ import type { Client } from "./db";
 import type { AmmPool } from "../../src/lib/economy/amm";
 import type { Order, Side } from "../../src/lib/economy/types";
 
-/** 체결 대상 반대편 호가장을 잠그고 로드(FOR UPDATE). */
-export async function loadOppositeBook(
-  client: Client,
-  securityId: string,
-  takerSide: Side,
-): Promise<Order[]> {
-  const makerSide: Side = takerSide === "buy" ? "sell" : "buy";
-  const { rows } = await client.query(
-    `select id, owner_id, limit_price::text as limit_price, quantity::text as quantity, ts
-       from orders
-      where security_id = $1 and side = $2 and status = 'open'
-      for update`,
-    [securityId, makerSide],
-  );
-  return rows.map((r) => ({
-    id: r.id as string,
-    securityId,
-    side: makerSide,
-    ownerId: r.owner_id as string,
-    limitPrice: r.limit_price as string,
-    quantity: r.quantity as string,
-    ts: Number(r.ts),
-  }));
-}
+// ---- 증권 ----
 
-export async function loadPool(client: Client, securityId: string): Promise<AmmPool | null> {
+export async function getSecurity(
+  client: Client,
+  id: string,
+): Promise<{ currency: string; status: string } | null> {
   const { rows } = await client.query(
-    `select currency, reserve_base::text as reserve_base, reserve_quote::text as reserve_quote,
-            total_shares::text as total_shares, fee_bps
-       from amm_pools where security_id = $1 for update`,
-    [securityId],
+    `select currency, status from securities where id = $1 for update`,
+    [id],
   );
   const row = rows[0];
-  if (!row) return null;
-  return {
-    securityId,
-    currency: row.currency as string,
-    reserveBase: row.reserve_base as string,
-    reserveQuote: row.reserve_quote as string,
-    totalShares: row.total_shares as string,
-    feeBps: Number(row.fee_bps),
-  };
+  return row ? { currency: row.currency, status: row.status } : null;
 }
 
-export async function savePool(client: Client, poolState: AmmPool): Promise<void> {
+export async function insertSecurity(
+  client: Client,
+  s: {
+    id: string; type: string; ticker: string; issuerUserId: string;
+    nationId: string | null; exchangeId: string | null; currency: string;
+  },
+): Promise<void> {
   await client.query(
-    `update amm_pools
-        set reserve_base = $2, reserve_quote = $3, total_shares = $4
-      where security_id = $1`,
-    [poolState.securityId, poolState.reserveBase, poolState.reserveQuote, poolState.totalShares],
+    `insert into securities (id, type, ticker, issuer_user_id, nation_id, exchange_id, currency, status)
+       values ($1,$2,$3,$4,$5,$6,$7,'listed')`,
+    [s.id, s.type, s.ticker, s.issuerUserId, s.nationId, s.exchangeId, s.currency],
+  );
+}
+
+export async function listSecurities(client: Client): Promise<Array<Record<string, unknown>>> {
+  const { rows } = await client.query(
+    `select id, type, ticker, issuer_user_id, currency, status from securities order by created_at`,
+  );
+  return rows;
+}
+
+// ---- 계정: 유저 / 현금 / 포지션 ----
+
+export async function upsertUser(client: Client, id: string, handle: string | null): Promise<void> {
+  await client.query(
+    `insert into users (id, handle) values ($1, $2) on conflict (id) do nothing`,
+    [id, handle],
   );
 }
 
@@ -91,12 +82,51 @@ export async function setPosition(client: Client, userId: string, securityId: st
   );
 }
 
-/** 라우팅 후 살아남은 호가는 잔량 갱신, 소진된 호가는 filled 처리. */
-export async function reconcileBook(
+export async function getAccount(
   client: Client,
-  originalIds: string[],
-  survivors: Order[],
-): Promise<void> {
+  userId: string,
+): Promise<{ cash: Array<Record<string, unknown>>; positions: Array<Record<string, unknown>> }> {
+  const cash = await client.query(
+    `select currency, balance::text as balance from cash_ledger where user_id = $1`,
+    [userId],
+  );
+  const positions = await client.query(
+    `select security_id, quantity::text as quantity from positions where user_id = $1 and quantity <> 0`,
+    [userId],
+  );
+  return { cash: cash.rows, positions: positions.rows };
+}
+
+// ---- 호가장(CLOB) ----
+
+export async function loadOppositeBook(client: Client, securityId: string, takerSide: Side): Promise<Order[]> {
+  const makerSide: Side = takerSide === "buy" ? "sell" : "buy";
+  const { rows } = await client.query(
+    `select id, owner_id, limit_price::text as limit_price, quantity::text as quantity, ts
+       from orders where security_id = $1 and side = $2 and status = 'open' for update`,
+    [securityId, makerSide],
+  );
+  return rows.map((r) => ({
+    id: r.id, securityId, side: makerSide, ownerId: r.owner_id,
+    limitPrice: r.limit_price, quantity: r.quantity, ts: Number(r.ts),
+  }));
+}
+
+export async function loadOrder(
+  client: Client,
+  id: string,
+): Promise<{ securityId: string; side: Side; ownerId: string; limitPrice: string; quantity: string; status: string } | null> {
+  const { rows } = await client.query(
+    `select security_id, side, owner_id, limit_price::text as limit_price, quantity::text as quantity, status
+       from orders where id = $1 for update`,
+    [id],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return { securityId: r.security_id, side: r.side, ownerId: r.owner_id, limitPrice: r.limit_price, quantity: r.quantity, status: r.status };
+}
+
+export async function reconcileBook(client: Client, originalIds: string[], survivors: Order[]): Promise<void> {
   const survivorById = new Map(survivors.map((o) => [o.id, o.quantity]));
   for (const id of originalIds) {
     const remaining = survivorById.get(id);
@@ -111,27 +141,96 @@ export async function reconcileBook(
 export async function insertResting(client: Client, order: Order, status = "open"): Promise<void> {
   await client.query(
     `insert into orders (id, security_id, side, owner_id, limit_price, quantity, ts, status)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       values ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [order.id, order.securityId, order.side, order.ownerId, order.limitPrice, order.quantity, order.ts, status],
   );
 }
 
+export async function setOrderStatus(client: Client, id: string, status: string): Promise<void> {
+  await client.query(`update orders set status = $2 where id = $1`, [id, status]);
+}
+
+export async function topOfBook(client: Client, securityId: string, side: Side, limit = 10): Promise<Array<Record<string, unknown>>> {
+  const order = side === "buy" ? "desc" : "asc";
+  const { rows } = await client.query(
+    `select id, owner_id, limit_price::text as price, quantity::text as quantity
+       from orders where security_id = $1 and side = $2 and status = 'open'
+      order by limit_price ${order}, ts asc limit $3`,
+    [securityId, side, limit],
+  );
+  return rows;
+}
+
 export async function insertTrade(
   client: Client,
-  t: {
-    securityId: string;
-    price: string;
-    quantity: string;
-    value: string;
-    buyerId: string | null;
-    sellerId: string | null;
-    source: "clob" | "amm";
-    takerSide: Side;
-  },
+  t: { securityId: string; price: string; quantity: string; value: string; buyerId: string | null; sellerId: string | null; source: "clob" | "amm"; takerSide: Side; tick?: number | null },
 ): Promise<void> {
   await client.query(
-    `insert into trades (security_id, price, quantity, value, buyer_id, seller_id, source, taker_side)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [t.securityId, t.price, t.quantity, t.value, t.buyerId, t.sellerId, t.source, t.takerSide],
+    `insert into trades (security_id, price, quantity, value, buyer_id, seller_id, source, taker_side, tick)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [t.securityId, t.price, t.quantity, t.value, t.buyerId, t.sellerId, t.source, t.takerSide, t.tick ?? null],
   );
+}
+
+export async function recentTrades(client: Client, securityId: string, limit = 20): Promise<Array<Record<string, unknown>>> {
+  const { rows } = await client.query(
+    `select price::text as price, quantity::text as quantity, source, taker_side, created_at
+       from trades where security_id = $1 order by id desc limit $2`,
+    [securityId, limit],
+  );
+  return rows;
+}
+
+// ---- AMM ----
+
+export async function loadPool(client: Client, securityId: string): Promise<AmmPool | null> {
+  const { rows } = await client.query(
+    `select currency, reserve_base::text as reserve_base, reserve_quote::text as reserve_quote,
+            total_shares::text as total_shares, fee_bps
+       from amm_pools where security_id = $1 for update`,
+    [securityId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return { securityId, currency: row.currency, reserveBase: row.reserve_base, reserveQuote: row.reserve_quote, totalShares: row.total_shares, feeBps: Number(row.fee_bps) };
+}
+
+export async function upsertPool(client: Client, poolState: AmmPool): Promise<void> {
+  await client.query(
+    `insert into amm_pools (security_id, currency, reserve_base, reserve_quote, total_shares, fee_bps)
+       values ($1,$2,$3,$4,$5,$6)
+       on conflict (security_id) do update
+         set reserve_base = excluded.reserve_base, reserve_quote = excluded.reserve_quote,
+             total_shares = excluded.total_shares`,
+    [poolState.securityId, poolState.currency, poolState.reserveBase, poolState.reserveQuote, poolState.totalShares, poolState.feeBps],
+  );
+}
+
+export async function addLpShares(client: Client, securityId: string, userId: string, minted: string, quantityAdd: (a: string, b: string) => string): Promise<void> {
+  const { rows } = await client.query(
+    `select shares::text as shares from amm_lp_positions where security_id = $1 and user_id = $2 for update`,
+    [securityId, userId],
+  );
+  const current = (rows[0]?.shares as string | undefined) ?? "0";
+  await client.query(
+    `insert into amm_lp_positions (security_id, user_id, shares) values ($1,$2,$3)
+       on conflict (security_id, user_id) do update set shares = excluded.shares`,
+    [securityId, userId, quantityAdd(current, minted)],
+  );
+}
+
+// ---- world (틱 시계) ----
+
+export async function ensureWorld(client: Client, epochMs: number, tickSeconds: number): Promise<{ epochMs: number; tickSeconds: number; lastProcessedTick: number }> {
+  await client.query(
+    `insert into world (id, epoch_ms, tick_seconds) values (1, $1, $2) on conflict (id) do nothing`,
+    [epochMs, tickSeconds],
+  );
+  const { rows } = await client.query(`select epoch_ms, tick_seconds, last_processed_tick from world where id = 1 for update`);
+  const r = rows[0];
+  return { epochMs: Number(r.epoch_ms), tickSeconds: Number(r.tick_seconds), lastProcessedTick: Number(r.last_processed_tick) };
+}
+
+export async function setLastProcessedTick(client: Client, tick: number): Promise<void> {
+  await client.query(`update world set last_processed_tick = $1 where id = 1`, [tick]);
 }

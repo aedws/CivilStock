@@ -11,4 +11,8 @@ export const config = {
   tickSecret: process.env.TICK_SECRET ?? "",
   /** 1년 = 몇 틱인가(쿠폰 연율 환산). 현실 1시간=게임 1일 가정 시 24*365. */
   ticksPerYear: Number(process.env.TICKS_PER_YEAR ?? 8760),
+  /** 1틱 = 몇 초(현실 시간). 기본 3600초=1시간. world 최초 생성 시에만 사용. */
+  tickSeconds: Number(process.env.TICK_SECONDS ?? 3600),
+  /** 한 번의 /tick 호출에서 밀린 틱을 최대 몇 개까지 따라잡을지. */
+  maxCatchupTicks: Number(process.env.MAX_CATCHUP_TICKS ?? 1000),
 };

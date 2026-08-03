@@ -136,3 +136,11 @@ create table if not exists tick_log (
   processed_at timestamptz not null default now(),
   events jsonb
 );
+
+-- 세계 시계: 기원점(epoch)과 틱 간격. 서버가 경과 시간으로 현재 tick을 산출한다.
+create table if not exists world (
+  id int primary key default 1 check (id = 1),
+  epoch_ms bigint not null,
+  tick_seconds int not null default 3600,
+  last_processed_tick bigint not null default 0
+);

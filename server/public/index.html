@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CivilStock — 콘솔</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 1rem; max-width: 900px; margin-inline: auto; line-height: 1.5; }
+  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+  .sub { opacity: .7; font-size: .85rem; margin-bottom: 1rem; }
+  fieldset { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 10px; margin: 0 0 1rem; padding: .8rem 1rem 1rem; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: inline-flex; flex-direction: column; font-size: .78rem; opacity: .85; margin: .25rem .5rem .25rem 0; }
+  input, select { font: inherit; padding: .35rem .5rem; border-radius: 7px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: transparent; color: inherit; min-width: 7rem; }
+  button { font: inherit; font-weight: 600; padding: .45rem .9rem; border-radius: 8px; border: 0; background: #2563eb; color: #fff; cursor: pointer; margin-top: .5rem; }
+  button.secondary { background: color-mix(in srgb, currentColor 15%, transparent); color: inherit; }
+  .row { display: flex; flex-wrap: wrap; align-items: end; gap: .1rem .3rem; }
+  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: .7rem; border-radius: 8px; overflow-x: auto; font-size: .8rem; white-space: pre-wrap; word-break: break-all; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  code { background: color-mix(in srgb, currentColor 10%, transparent); padding: .05rem .3rem; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <h1>CivilStock 콘솔</h1>
+  <div class="sub">유저가 직접 발행하고 거래하는 시장. 서버 권위 · CLOB+AMM · 에스크로 · 자동 틱.</div>
+
+  <fieldset>
+    <legend>① 계정</legend>
+    <div class="row">
+      <label>userId <input id="acc_user" value="me" /></label>
+      <label>통화 <input id="acc_cur" value="USD" /></label>
+      <label>초기 현금(minor) <input id="acc_cash" value="100000000" /></label>
+      <button onclick="createAccount()">계정 생성 + 현금 지급</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>② 발행 (IPO)</legend>
+    <div class="row">
+      <label>종목 id <input id="iss_id" value="sec_acme" /></label>
+      <label>티커 <input id="iss_ticker" value="ACME" /></label>
+      <label>통화 <input id="iss_cur" value="USD" /></label>
+      <label>발행주식수 <input id="iss_shares" value="1000000" /></label>
+      <button onclick="issueEquity()">주식 발행</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>③ AMM 유동성 예치 (시장 조성)</legend>
+    <div class="row">
+      <label>종목 id <input id="lp_sec" value="sec_acme" /></label>
+      <label>공급자 <input id="lp_user" value="me" /></label>
+      <label>주식 넣기 <input id="lp_base" value="1000" /></label>
+      <label>현금 넣기(minor) <input id="lp_quote" value="100000" /></label>
+      <button onclick="provideLiquidity()">유동성 예치</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>④ 주문</legend>
+    <div class="row">
+      <label>주문 id <input id="ord_id" value="o1" /></label>
+      <label>종목 <input id="ord_sec" value="sec_acme" /></label>
+      <label>계정 <input id="ord_user" value="me" /></label>
+      <label>방향 <select id="ord_side"><option>buy</option><option>sell</option></select></label>
+      <label>수량 <input id="ord_qty" value="5" /></label>
+      <label>지정가(비우면 시장가) <input id="ord_limit" placeholder="market" /></label>
+      <button onclick="placeOrder()">주문</button>
+      <button class="secondary" onclick="cancelOrder()">이 주문 취소</button>
+    </div>
+  </fieldset>
+
+  <div class="grid2">
+    <fieldset>
+      <legend>시장</legend>
+      <div class="row"><label>종목 <input id="mkt_sec" value="sec_acme" /></label><button class="secondary" onclick="loadMarket()">새로고침</button></div>
+      <pre id="mkt_out">—</pre>
+    </fieldset>
+    <fieldset>
+      <legend>내 계정</legend>
+      <div class="row"><label>userId <input id="q_user" value="me" /></label><button class="secondary" onclick="loadAccount()">조회</button></div>
+      <pre id="acc_out">—</pre>
+    </fieldset>
+  </div>
+
+  <fieldset>
+    <legend>세계 시계 · 틱</legend>
+    <div class="row">
+      <button class="secondary" onclick="loadWorld()">/world 조회</button>
+      <label>TICK_SECRET <input id="tick_secret" value="dev-secret" /></label>
+      <button onclick="runTick()">/tick 실행(밀린 틱 따라잡기)</button>
+    </div>
+    <pre id="world_out">—</pre>
+  </fieldset>
+
+  <fieldset>
+    <legend>응답 로그</legend>
+    <pre id="log">준비됨.</pre>
+  </fieldset>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const log = (label, data) => { $("log").textContent = label + "\n" + JSON.stringify(data, null, 2); };
+async function api(method, path, body, headers) {
+  const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(headers||{}) }, body: body ? JSON.stringify(body) : undefined });
+  const json = await res.json().catch(() => ({}));
+  log(`${method} ${path} → ${res.status}`, json);
+  return json;
+}
+async function createAccount() {
+  await api("POST", "/accounts", { userId: $("acc_user").value, currency: $("acc_cur").value, grantCash: $("acc_cash").value });
+}
+async function issueEquity() {
+  await api("POST", "/issue/equity", { id: $("iss_id").value, ticker: $("iss_ticker").value, issuerUserId: $("acc_user").value, currency: $("iss_cur").value, sharesOutstanding: $("iss_shares").value });
+}
+async function provideLiquidity() {
+  await api("POST", "/pools/liquidity", { securityId: $("lp_sec").value, providerId: $("lp_user").value, baseIn: $("lp_base").value, quoteIn: $("lp_quote").value });
+  loadMarket();
+}
+async function placeOrder() {
+  const limit = $("ord_limit").value.trim();
+  await api("POST", "/orders", { orderId: $("ord_id").value, securityId: $("ord_sec").value, ownerId: $("ord_user").value, side: $("ord_side").value, quantity: $("ord_qty").value, limitPrice: limit || undefined });
+  loadMarket(); loadAccount();
+}
+async function cancelOrder() {
+  await api("POST", "/orders/cancel", { orderId: $("ord_id").value, ownerId: $("ord_user").value });
+  loadMarket(); loadAccount();
+}
+async function loadMarket() { $("mkt_out").textContent = JSON.stringify(await (await fetch("/market?securityId=" + encodeURIComponent($("mkt_sec").value))).json(), null, 2); }
+async function loadAccount() { $("acc_out").textContent = JSON.stringify(await (await fetch("/account?userId=" + encodeURIComponent($("q_user").value))).json(), null, 2); }
+async function loadWorld() { $("world_out").textContent = JSON.stringify(await (await fetch("/world")).json(), null, 2); }
+async function runTick() { await api("POST", "/tick", {}, { "x-tick-secret": $("tick_secret").value }); loadWorld(); }
+loadWorld();
+</script>
+</body>
+</html>

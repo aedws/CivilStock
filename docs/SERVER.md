@@ -28,22 +28,36 @@ DB는 Neon(무료·서버리스), 컴퓨팅은 Cloud Run. 표준 Postgres라 Clo
 - **멱등 틱**: `tick_log`에 처리한 틱을 기록하고 `on conflict do nothing`으로 중복
   처리(이중 쿠폰 지급 등)를 막는다.
 
-## 엔드포인트 (스켈레톤)
+## 엔드포인트
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
+| GET | `/` | 웹 콘솔 UI(`public/index.html`) — 브라우저로 직접 조작 |
 | GET | `/healthz` | 헬스체크 |
-| POST | `/orders` | 주문 접수 → CLOB+AMM 최선체결·정산·호가장/풀 갱신 |
-| POST | `/tick` | worldTick(Scheduler 전용, `x-tick-secret` 인증) |
+| GET | `/world` | 세계 시계(epoch·tickSeconds·currentTick·lastProcessedTick) |
+| GET | `/securities` | 상장 종목 목록 |
+| GET | `/account?userId=` | 계정 현금·포지션 |
+| GET | `/market?securityId=` | AMM 풀·현물가·상위 호가·최근 체결 |
+| POST | `/accounts` | 계정 생성(+테스트 현금 지급) |
+| POST | `/issue/equity` `\|` `/issue/bond` `\|` `/issue/etf` | **발행(B)** — 유저 발행권 |
+| POST | `/pools/liquidity` | AMM 유동성 예치(시장 조성) |
+| POST | `/orders` | 주문 접수 → CLOB+AMM 최선체결·정산·**에스크로(A)** |
+| POST | `/orders/cancel` | 레스팅 주문 취소 → 에스크로 환불 |
+| POST | `/tick` | **자동 틱(C)** — 경과 시간으로 밀린 틱 따라잡기(`x-tick-secret`) |
 
-`/orders`가 "상태 로드 → 순수 코어 → 영속화"의 대표 구현이다. 발행(회사·ETF·채권),
-ETF 생성/상환, AMM 유동성 예치 등 나머지 액션도 같은 레시피로 추가한다.
+`/orders`가 "상태 로드 → 순수 코어 → 영속화"의 대표 구현이다.
 
-## 알려진 TODO (스켈레톤 → 실서비스)
+## 구현 완료
 
-- **에스크로**: 지정가 접수 시점에 현금(매수)/주식(매도)을 잠가야 이중지출을 막는다.
-  현재는 즉시 체결분만 정산하고 잔량 호가는 미에스크로.
+- **에스크로(A)**: 지정가 잔량을 접수 시 잠금(매수=현금, 매도=주식). "레스팅 주문 =
+  에스크로 기록"이라 별도 테이블 불필요. 메이커 체결 시 재정산 안 함(이중지출 방지),
+  취소 시 환불. *로컬 Postgres 시나리오로 부분체결·환불·무이중차감 검증.*
+- **발행(B)**: 유저가 계정·주식·채권·ETF를 직접 발행. 운영자 승인 게이트 없음.
+- **자동 틱(C)**: `world` 테이블의 epoch 기준으로 서버가 현재 tick을 산출하고 밀린
+  틱을 따라잡는다. Scheduler는 body 없이 `/tick`만 두드리면 됨. tick_log로 멱등.
+
+## 남은 TODO (실서비스)
+
 - **증거금·청산**: 공매도·선물은 담보 계정 + 마크투마켓 + 강제청산 필요(다음 슬라이스).
-- **tick 계산**: 현재 body의 tick을 신뢰. 서버가 "기원점 기준 경과 시간"으로 산출하도록 확장.
-- **인증/레이트리밋**: `/orders`에 유저 인증(Identity Platform)·rate limit 추가.
+- **인증/레이트리밋**: 유저 인증(Identity Platform)·rate limit. 현재 UI는 데모용.
 - **실시간 구독**: 클라이언트로의 호가·체결 팬아웃(SSE/WebSocket + Redis).
