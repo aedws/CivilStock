@@ -93,6 +93,27 @@ export async function listNations(client: Client): Promise<Array<Record<string, 
   return rows;
 }
 
+export async function insertPriceTick(client: Client, securityId: string, price: string): Promise<void> {
+  await client.query(`insert into price_ticks (security_id, price) values ($1, $2)`, [securityId, price]);
+}
+
+/** 시세 이력을 한 번에 삽입(건국 시 랜덤워크 시딩용). */
+export async function insertPriceHistory(client: Client, securityId: string, prices: string[]): Promise<void> {
+  if (!prices.length) return;
+  const values: string[] = [];
+  const params: unknown[] = [securityId];
+  for (const p of prices) { params.push(p); values.push(`($1, $${params.length})`); }
+  await client.query(`insert into price_ticks (security_id, price) values ${values.join(",")}`, params);
+}
+
+export async function listPriceHistory(client: Client, securityId: string, limit = 150): Promise<string[]> {
+  const { rows } = await client.query(
+    `select price::text as price from price_ticks where security_id = $1 order by id desc limit $2`,
+    [securityId, limit],
+  );
+  return rows.map((r) => r.price as string).reverse();
+}
+
 export async function getArmy(client: Client, nationId: string): Promise<bigint> {
   const { rows } = await client.query(`select army::text as army from military where nation_id = $1 for update`, [nationId]);
   return BigInt((rows[0]?.army as string | undefined) ?? "0");

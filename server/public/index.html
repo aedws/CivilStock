@@ -71,6 +71,8 @@
   .tf{display:flex;gap:.12rem;padding:.4rem 1rem .1rem;flex-wrap:wrap}
   .tf button{background:none;color:var(--muted);font-size:.74rem;padding:.18rem .4rem;border-radius:6px}
   .tf button.on{background:var(--panel2);color:var(--text)}
+  .chartinfo{display:flex;gap:.8rem;justify-content:flex-end;padding:.2rem 1rem .4rem;font-size:.74rem;font-variant-numeric:tabular-nums}
+  svg.chart{height:170px}
 
   .dhead{display:flex;align-items:baseline;gap:.7rem;padding:1rem 1rem .3rem;flex-wrap:wrap}
   .dhead .dtk{font-size:1.15rem;font-weight:800}
@@ -159,7 +161,7 @@
       <div class="dtabs"><button id="dt_chart" class="on" onclick="setDetTab('chart')">차트</button>
         <button id="dt_book" onclick="setDetTab('book')">호가</button>
         <button id="dt_trades" onclick="setDetTab('trades')">체결</button></div>
-      <div id="pane_chart"><div class="tf" id="tf"></div><svg class="chart" id="chart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg></div>
+      <div id="pane_chart"><div class="tf" id="tf"></div><svg class="chart" id="chart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg><div class="chartinfo" id="chartinfo"></div></div>
       <div id="pane_book" style="display:none"><div class="book"><div class="col" id="asks"></div><div class="col" id="bids"></div></div></div>
       <div id="pane_trades" style="display:none"><div class="trlist" id="trades"></div></div>
 
@@ -352,7 +354,7 @@ function renderAssetTabs(){
 }
 function setAssetTab(k){ state.assetTab=k; renderAssetTabs(); renderMarketList(); }
 function rowSpark(m){
-  const t=(m&&m.trades)?[...m.trades].reverse().map(x=>Number(x.price)):[];
+  const t=priceSeries(m);
   if(t.length<2) return `<svg class="rowspark"></svg>`;
   const min=Math.min(...t),max=Math.max(...t),rng=(max-min)||1; const up=t[t.length-1]>=t[0];
   const pts=t.map((p,i)=>`${(i/(t.length-1))*56},${28-((p-min)/rng)*24-2}`).join(" ");
@@ -378,8 +380,9 @@ async function renderMarketList(){
     el.appendChild(div);
   });
 }
-function lastPrice(m){ if(m&&m.trades&&m.trades.length) return m.trades[0].price; if(m&&m.ammSpot) return m.ammSpot; return null; }
-function changePct(m){ if(!m||!m.trades||m.trades.length<2) return null; const last=Number(m.trades[0].price),open=Number(m.trades[m.trades.length-1].price); if(!open) return null; return (last-open)/open*100; }
+function priceSeries(m){ if(m&&m.history&&m.history.length>=2) return m.history.map(Number); if(m&&m.trades&&m.trades.length>=2) return [...m.trades].reverse().map(x=>Number(x.price)); return []; }
+function lastPrice(m){ if(m&&m.trades&&m.trades.length) return m.trades[0].price; if(m&&m.ammSpot) return m.ammSpot; if(m&&m.history&&m.history.length) return m.history[m.history.length-1]; return null; }
+function changePct(m){ const s=priceSeries(m); if(s.length<2) return null; const open=s[0],last=s[s.length-1]; if(!open) return null; return (last-open)/open*100; }
 
 // ---- detail ----
 async function selectSecurity(id){
@@ -408,16 +411,23 @@ const TFS=[{k:"s",l:"30초",n:30},{k:"m",l:"1분",n:20},{k:"m5",l:"5분",n:12},{
 function renderTf(){ $("tf").innerHTML=TFS.map(t=>`<button class="${(state.tf||'m')===t.k?'on':''}" onclick="setTf('${t.k}')">${t.l}</button>`).join(""); }
 function setTf(k){ state.tf=k; renderTf(); if(state.market) drawChart(state.market); }
 function drawChart(m){
-  const svg=$("chart"); const raw=(m&&m.trades)?[...m.trades].reverse().map(x=>Number(x.price)):[];
-  if(raw.length<2){ svg.innerHTML=`<text x="150" y="78" fill="${getCss('--muted')}" font-size="11" text-anchor="middle">체결 데이터 대기</text>`; return; }
+  const svg=$("chart"); const raw=priceSeries(m);
+  if(raw.length<2){ svg.innerHTML=`<text x="150" y="88" fill="${getCss('--muted')}" font-size="11" text-anchor="middle">체결 데이터 대기</text>`; $("chartinfo").innerHTML=""; return; }
   const tf=TFS.find(x=>x.k===(state.tf||"m")); const N=Math.min(tf?tf.n:20, raw.length); const per=Math.ceil(raw.length/N);
   const candles=[]; for(let i=0;i<raw.length;i+=per){ const g=raw.slice(i,i+per); candles.push({o:g[0],c:g[g.length-1],h:Math.max(...g),l:Math.min(...g)}); }
   const min=Math.min(...candles.map(k=>k.l)),max=Math.max(...candles.map(k=>k.h)),rng=(max-min)||1;
-  const W=300,H=150,pad=8; const cw=W/candles.length; const Y=p=>H-pad-((p-min)/rng)*(H-2*pad);
-  svg.innerHTML=candles.map((k,i)=>{ const x=i*cw+cw/2; const up=k.c>=k.o; const col=up?getCss("--up"):getCss("--down");
-    const top=Y(Math.max(k.o,k.c)),bot=Y(Math.min(k.o,k.c)); const bw=Math.max(2,cw*0.62);
+  const W=300,H=170,pad=10; const cw=W/candles.length; const Y=p=>H-pad-((p-min)/rng)*(H-2*pad);
+  let grid=""; for(let i=0;i<=3;i++){ const yy=(pad+(H-2*pad)*i/3).toFixed(1); grid+=`<line x1="0" y1="${yy}" x2="${W}" y2="${yy}" stroke="#fff" stroke-opacity="0.05" stroke-width="1" vector-effect="non-scaling-stroke"/>`; }
+  const upc=getCss("--up"), dnc=getCss("--down");
+  const body=candles.map((k,i)=>{ const x=i*cw+cw/2; const up=k.c>=k.o; const col=up?upc:dnc;
+    const top=Y(Math.max(k.o,k.c)),bot=Y(Math.min(k.o,k.c)); const bw=Math.max(2,cw*0.6);
     return `<line x1="${x.toFixed(1)}" y1="${Y(k.h).toFixed(1)}" x2="${x.toFixed(1)}" y2="${Y(k.l).toFixed(1)}" stroke="${col}" stroke-width="1" vector-effect="non-scaling-stroke"/><rect x="${(x-bw/2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bot-top).toFixed(1)}" fill="${col}"/>`;
   }).join("");
+  const win=5; let ma="";
+  if(candles.length>=win){ const pts=[]; for(let i=win-1;i<candles.length;i++){ let s=0; for(let j=0;j<win;j++) s+=candles[i-j].c; const x=i*cw+cw/2; pts.push(`${x.toFixed(1)},${Y(s/win).toFixed(1)}`);} ma=`<polyline points="${pts.join(' ')}" fill="none" stroke="#e6b422" stroke-width="1.3" vector-effect="non-scaling-stroke"/>`; }
+  svg.innerHTML=grid+body+ma;
+  const cur=raw[raw.length-1], curCol=candles[candles.length-1].c>=candles[candles.length-1].o?"up":"down";
+  $("chartinfo").innerHTML=`<span class="up">고 ${money(max,state.sec.currency)}</span><span class="down">저 ${money(min,state.sec.currency)}</span><span class="${curCol}">현재 ${money(cur,state.sec.currency)}</span><span class="muted">MA5</span>`;
 }
 function drawBook(m,s){
   const asks=(m.asks||[]).slice().reverse(), bids=(m.bids||[]);

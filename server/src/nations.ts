@@ -21,6 +21,18 @@ const SEED_COMPANIES = [
   { suffix: "ship", name: "해운", shares: "1500000", base: "4000", quote: "140000" }, // $0.35
 ] as const;
 
+/** base 가격 주변 랜덤워크 n개(정수 minor 문자열). 캔들이 위아래로 움직이도록. */
+function genHistory(base: number, n: number): string[] {
+  const out: string[] = [];
+  let p = base * 0.9;
+  for (let i = 0; i < n; i++) {
+    const step = (Math.random() - 0.47) * base * 0.035; // 소폭 상승 편향
+    p = Math.max(1, p + step);
+    out.push(String(Math.round(p)));
+  }
+  return out;
+}
+
 async function bootstrapMarket(client: Client, nationId: string, currency: string): Promise<number> {
   for (const c of SEED_COMPANIES) {
     const id = `${nationId}_${c.suffix}`;
@@ -38,6 +50,8 @@ async function bootstrapMarket(client: Client, nationId: string, currency: strin
          values ($1, $2, $3, $4, $3, 30) on conflict (security_id) do nothing`,
       [id, currency, c.base, c.quote],
     );
+    const spot = Number(c.quote) / Number(c.base);
+    await repo.insertPriceHistory(client, id, genHistory(spot, 90));
   }
   return SEED_COMPANIES.length;
 }

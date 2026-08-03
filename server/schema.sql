@@ -147,6 +147,15 @@ create table if not exists territories (
 );
 create index if not exists territories_nation_idx on territories(nation_id);
 
+-- 시세 이력: 캔들차트 원천. 건국 시 랜덤워크 이력 생성 + 체결·틱마다 추가된다.
+create table if not exists price_ticks (
+  id bigserial primary key,
+  security_id text references securities(id),
+  price numeric not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists price_ticks_sec_idx on price_ticks(security_id, id);
+
 -- 군사: 국가별 병력 풀. 경제(현금)로 모집하고 전쟁에서 소모한다.
 create table if not exists military (
   nation_id text primary key references nations(id),

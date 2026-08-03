@@ -101,6 +101,8 @@ export async function placeOrder(input: PlaceOrderInput) {
         ownerId: input.ownerId, limitPrice: input.limitPrice as string, quantity: result.remaining, ts: Date.now(),
       });
     }
+    const execs = result.executions;
+    if (execs.length) await repo.insertPriceTick(client, input.securityId, execs[execs.length - 1]!.price);
     return result;
   });
 }

@@ -31,7 +31,8 @@ export async function getMarket(securityId: string) {
     const ammSpot = poolState ? spotPrice(poolState) : null;
     const eq = await client.query(`select shares_outstanding::text as s from equity_details where security_id = $1`, [securityId]);
     const sharesOutstanding = (eq.rows[0]?.s as string | undefined) ?? null;
-    return { pool: poolState as AmmPool | null, ammSpot, sharesOutstanding, bids, asks, trades };
+    const history = await repo.listPriceHistory(client, securityId, 150);
+    return { pool: poolState as AmmPool | null, ammSpot, sharesOutstanding, bids, asks, trades, history };
   } finally {
     client.release();
   }

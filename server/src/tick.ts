@@ -45,8 +45,28 @@ export async function runDueTicks() {
   });
 }
 
-/** 한 틱의 채권 쿠폰·만기·디폴트 처리. */
+/** NPC(system 발행) 종목 시세를 소폭 랜덤워크시켜 시장을 살아 움직이게 한다. */
+async function driftNpcMarkets(client: Client): Promise<void> {
+  const { rows } = await client.query(
+    `select p.security_id, p.reserve_base::text as rb, p.reserve_quote::text as rq
+       from amm_pools p join securities s on s.id = p.security_id
+      where s.issuer_user_id is null and s.status = 'listed'`,
+  );
+  for (const r of rows) {
+    const base = Number(r.rb);
+    const quote = Number(r.rq);
+    if (!(base > 0) || !(quote > 0)) continue;
+    const factor = 1 + (Math.random() - 0.5) * 0.06; // ±3%
+    const newQuote = Math.max(1, Math.round(quote * factor));
+    await client.query(`update amm_pools set reserve_quote = $2 where security_id = $1`, [r.security_id, String(newQuote)]);
+    const spot = Math.max(1, Math.round(newQuote / base));
+    await repo.insertPriceTick(client, r.security_id, String(spot));
+  }
+}
+
+/** 한 틱의 채권 쿠폰·만기·디폴트 처리 + NPC 시세 드리프트. */
 async function processTick(client: Client, tick: number): Promise<TickEvent[]> {
+  await driftNpcMarkets(client);
   const bres = await client.query(
     `select s.id, s.ticker, s.issuer_user_id, s.nation_id, s.exchange_id, s.currency, s.status,
             b.face_value::text as face_value, b.coupon_rate::text as coupon_rate,
