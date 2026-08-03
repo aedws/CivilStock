@@ -9,9 +9,12 @@
 [웹앱]  ──HTTPS──▶  Cloud Run: 권위 API 서버 (server/src)
                       │  트랜잭션마다: 상태 로드 → 순수 코어 호출 → 영속화
                       ▼
-                   Cloud SQL (Postgres, server/schema.sql)  ← 단일 진실원본
+                   Neon (서버리스 Postgres, server/schema.sql)  ← 단일 진실원본
 [Cloud Scheduler] ──POST /tick (TICK_SECRET)──▶ 서버 runTick (멱등)
 ```
+
+DB는 Neon(무료·서버리스), 컴퓨팅은 Cloud Run. 표준 Postgres라 Cloud SQL로의
+이전은 dump/restore로 언제든 가능(락인 없음). 연동은 [`../server/NEON.md`](../server/NEON.md).
 
 ## 핵심 설계
 

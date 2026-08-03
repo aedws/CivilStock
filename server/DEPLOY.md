@@ -1,40 +1,31 @@
 # CivilStock 서버 배포 — 오너 체크리스트
 
-서버 골격(스키마·API·틱)은 코드로 준비돼 있다. 아래는 **오너(계정 소유자)만 할 수
-있는** GCP 작업이다. `PROJECT_ID`, `REGION`(예: `asia-northeast3`=서울) 등을 자신의
-값으로 바꿔 실행한다.
+서버 골격(스키마·API·틱)은 코드로 준비돼 있다. **DB는 Neon**(무료·서버리스
+Postgres)을 쓰고, 컴퓨팅만 Cloud Run(GCP)에 올린다. `PROJECT_ID`,
+`REGION`(예: `asia-northeast3`=서울) 등을 자신의 값으로 바꿔 실행한다.
 
 ## 0. 선행
 
-- [ ] GCP 프로젝트 생성 + **결제 계정 연결**(Cloud SQL·Cloud Run은 결제 필요).
+- [ ] GCP 프로젝트 생성 + 결제 계정 연결(Cloud Run은 무료 티어 내 $0이지만 결제
+  계정 등록은 필요).
 - [ ] `gcloud` CLI 설치 후 `gcloud auth login`, `gcloud config set project PROJECT_ID`.
-- [ ] API 활성화:
+- [ ] API 활성화(Cloud SQL API 불필요):
   ```bash
-  gcloud services enable run.googleapis.com sqladmin.googleapis.com \
+  gcloud services enable run.googleapis.com \
     cloudscheduler.googleapis.com secretmanager.googleapis.com \
     artifactregistry.googleapis.com cloudbuild.googleapis.com
   ```
 
-## 1. Cloud SQL (Postgres) 생성 + 스키마 적용
+## 1. DB: Neon (Postgres)
 
-- [ ] 인스턴스 생성:
-  ```bash
-  gcloud sql instances create civilstock-db \
-    --database-version=POSTGRES_16 --tier=db-g1-small --region=REGION
-  gcloud sql databases create civilstock --instance=civilstock-db
-  gcloud sql users set-password postgres --instance=civilstock-db --password='STRONG_PW'
-  ```
-- [ ] 스키마 적용(로컬에서 `psql` 또는 Cloud SQL Studio):
-  ```bash
-  psql "host=... dbname=civilstock user=postgres" -f server/schema.sql
-  ```
+- [ ] **Neon 프로젝트 생성 + 스키마 적용 + `DATABASE_URL` 확보** → [`NEON.md`](./NEON.md).
+  Cloud SQL 인스턴스는 만들지 않는다(상시 과금 없음).
 
 ## 2. 비밀값 등록 (Secret Manager)
 
-- [ ] `DATABASE_URL`, `TICK_SECRET` 등록:
+- [ ] `DATABASE_URL`(Neon **pooled** 연결 문자열), `TICK_SECRET` 등록:
   ```bash
-  # 예: Cloud SQL 커넥터 소켓 경로 사용
-  printf 'postgres://postgres:STRONG_PW@/civilstock?host=/cloudsql/PROJECT_ID:REGION:civilstock-db' \
+  printf 'postgres://USER:PW@ep-xxxx-pooler.ap-northeast-1.aws.neon.tech/civilstock?sslmode=require' \
     | gcloud secrets create DATABASE_URL --data-file=-
   openssl rand -hex 32 | gcloud secrets create TICK_SECRET --data-file=-
   ```
@@ -46,12 +37,11 @@
   gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT_ID/civilstock/server \
     --file server/Dockerfile .
   ```
-- [ ] 배포(Cloud SQL 연결 + 비밀 주입):
+- [ ] 배포(비밀 주입만 — Cloud SQL 커넥터 불필요):
   ```bash
   gcloud run deploy civilstock-server \
     --image REGION-docker.pkg.dev/PROJECT_ID/civilstock/server \
     --region REGION --allow-unauthenticated \
-    --add-cloudsql-instances PROJECT_ID:REGION:civilstock-db \
     --set-secrets DATABASE_URL=DATABASE_URL:latest,TICK_SECRET=TICK_SECRET:latest \
     --set-env-vars TICKS_PER_YEAR=8760
   ```
@@ -77,11 +67,11 @@
 
 ---
 
-## 지금 당장 오너가 결정/제공해야 하는 것 (요약)
+## 지금 당장 오너가 제공해야 하는 것 (요약)
 
-1. **GCP 프로젝트 + 결제** — 이게 없으면 아무것도 못 띄운다.
-2. **REGION** 선택(서울 `asia-northeast3` 권장).
-3. **DB 비밀번호·TICK_SECRET** 등 비밀값.
-4. (선택) 커스텀 도메인.
+1. **Neon 프로젝트 생성 → pooled `DATABASE_URL`** ([`NEON.md`](./NEON.md)). — $0.
+2. **GCP 프로젝트 + 결제 계정 등록**(Cloud Run 무료 티어 내 $0, 등록만 필요).
+3. **REGION** 선택(서울 `asia-northeast3` 권장).
+4. **TICK_SECRET**(`openssl rand -hex 32`).
 
-코드·스키마·배포 명령은 준비돼 있으니, 위 1~4만 정해주면 배포까지 함께 진행할 수 있다.
+Cloud SQL을 안 쓰므로 상시 과금이 없다. 위 1~4만 주면 배포까지 함께 진행할 수 있다.

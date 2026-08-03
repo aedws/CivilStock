@@ -4,7 +4,7 @@
 2DStock의 아쉬웠던 점(유저 간 실질 상호작용 부재, 클라이언트 권위, 리셋 세계)을
 개선한 **서버 권위형 지속 세계** 게임을 지향한다.
 
-- 환경: **Google Cloud Run + GCP** (권위 서버 · Cloud SQL · Cloud Scheduler 틱 · 인증)
+- 환경: **Google Cloud Run** (권위 서버 · Cloud Scheduler 틱) + **Neon** (서버리스 Postgres)
 - 세계 모델: **6개월 시즌 소프트 리셋** / 국가는 **1인국 + 멀티** 병행
 - 설계 제안: [`docs/DESIGN.md`](docs/DESIGN.md)
 
