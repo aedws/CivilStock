@@ -150,12 +150,29 @@ MVP에 **공매도 + 파생(옵션·선물) 모두 포함**으로 확정(2026-08
 - `src/lib/economy/router.ts` — CLOB+AMM 스마트 라우터 최선체결(순수).
 - `src/lib/economy/ledger.ts` — 현금·포지션 원장 + 정산 불변식(순수).
 - `src/lib/economy/issuance.ts` — 주식·ETF·채권·옵션 발행 + NAV·쿠폰·생성/상환(순수).
-- `scripts/test-*.ts` — economy·amm·router·issuance 스위트 전부 통과.
+- `src/lib/economy/worldTick.ts` — 시간종속 정기 처리: 채권 쿠폰·만기·디폴트,
+  ETF NAV 스냅샷(순수+원장 변형). 서버는 Cloud Scheduler로 멱등 호출.
+- `scripts/test-*.ts` — economy·amm·router·issuance·world-tick 스위트 전부 통과.
 - 실행: `npm run test`(전체), 타입: `npm run typecheck`.
 
 ### 다음 슬라이스(미구현, 설계만)
 
-- 증거금·마크투마켓·강제청산 엔진(공매도·선물).
+- 증거금·마크투마켓·강제청산 엔진(공매도·선물) — worldTick에 얹는다.
 - 옵션 만기 정산·행사.
-- worldTick 연동(쿠폰 지급·마크투마켓·ETF NAV·실물경제 생산 흐름).
+- 실물경제 생산 흐름(자원→회사 투입/산출→실적) worldTick 연동.
 - 발행 스팸/사기 방지(거래소 상장 규정·공시·평판).
+
+## 11. 가격의 단일성 — "모두가 같은 가격을 보는가?"
+
+**그렇다. 단, 2DStock과 이유가 정반대다.**
+
+- **2DStock**: 가격이 고정 기원점 결정론 *공식*이라 모든 클라이언트가 각자 계산해도
+  같은 값 → 서버 불필요. 대신 실제 유저 거래가 가격에 영향을 못 준다.
+- **CivilStock**: 가격은 실제 주문 흐름에서 창발하므로 클라이언트가 계산할 수 없다.
+  대신 **서버(Cloud Run + Postgres)에 단일 권위 상태**(호가장·마지막 체결가·AMM
+  준비금)가 있고, 모든 클라이언트가 그 하나를 구독해 읽는다 → 같은 가격.
+
+즉 "같은 가격"은 **결정론이 아니라 단일 진실원본(single source of truth)**으로
+보장된다. 이건 유저 상호작용을 위해 반드시 치러야 하는 구조 전환이다. 거래는
+연속·실시간으로 이 상태를 갱신하고, worldTick은 그 위에서 시간종속 이벤트만 얹는다
+(쿠폰·만기·NAV) — worldTick이 순간가격을 바꾸는 게 아니다.

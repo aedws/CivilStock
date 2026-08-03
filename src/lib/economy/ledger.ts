@@ -76,6 +76,21 @@ export function quantityAdd(a: string, b: string): string {
   return normalizeExactQuantity(negative ? `-${decimal}` : decimal);
 }
 
+/** 특정 증권을 양(+)의 수량으로 보유한 유저 목록(틱 배당·쿠폰 대상). */
+export function holdersOf(
+  state: LedgerState,
+  securityId: string,
+): Array<{ userId: string; quantity: string }> {
+  const holders: Array<{ userId: string; quantity: string }> = [];
+  for (const [userId, bySecurity] of state.positions) {
+    const quantity = bySecurity.get(securityId);
+    if (quantity && quantityCompare(quantity, "0") > 0) {
+      holders.push({ userId, quantity });
+    }
+  }
+  return holders;
+}
+
 export type SettleResult =
   | { ok: true }
   | { ok: false; reason: "insufficient_cash" | "insufficient_position" };

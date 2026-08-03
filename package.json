@@ -10,7 +10,8 @@
     "test:amm": "tsx scripts/test-amm.ts",
     "test:router": "tsx scripts/test-router.ts",
     "test:issuance": "tsx scripts/test-issuance.ts",
-    "test": "npm run test:exact-amount && npm run test:economy && npm run test:amm && npm run test:router && npm run test:issuance",
+    "test:world-tick": "tsx scripts/test-world-tick.ts",
+    "test": "npm run test:exact-amount && npm run test:economy && npm run test:amm && npm run test:router && npm run test:issuance && npm run test:world-tick",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
