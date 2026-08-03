@@ -36,7 +36,7 @@
   @media(max-width:900px){.maprow{grid-template-columns:1fr}}
   .mapwrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;overflow:auto}
   svg#map{width:100%;height:auto;display:block}
-  .hex{stroke:#0d0d10;stroke-width:1.5;cursor:pointer;transition:filter .1s}
+  .hex{stroke:#3a3a48;stroke-width:1.5;cursor:pointer;transition:filter .1s}
   .hex:hover{filter:brightness(1.35)}
   .hex.sel{stroke:#fff;stroke-width:3}
   .mappanel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem;position:sticky;top:5rem}
@@ -238,14 +238,18 @@ function hexPts(cx,cy){ let p=[]; for(let i=0;i<6;i++){ const a=Math.PI/180*(60*
 function neighbors(q,r){ return [[q+1,r],[q-1,r],[q,r+1],[q,r-1],[q+1,r-1],[q-1,r+1]]; }
 function hueOf(id){ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))%360; return h; }
 function tileOwner(q,r){ return MAP&&MAP.territories?MAP.territories.find(t=>t.q===q&&t.r===r):null; }
-async function loadMap(){ MAP=await (await fetch("/map")).json(); renderMap(); renderLegend(); }
+async function loadMap(){
+  try { MAP=await (await fetch("/map")).json(); } catch(e){ MAP=null; }
+  if(!MAP || MAP.error || MAP.cols==null){ toast(MAP&&MAP.error?("지도 로드 실패: "+MAP.error):"지도 로드 실패"); MAP={cols:14,rows:9,territories:[],nations:[]}; }
+  renderMap(); renderLegend();
+}
 function renderMap(){
   if(!MAP) return; const cols=MAP.cols, rows=MAP.rows; const cells=[]; let maxX=0,maxY=0;
   for(let r=0;r<rows;r++) for(let q=0;q<cols;q++){ const {x,y}=axialPx(q,r); const cx=x+HS*2, cy=y+HS*1.3; cells.push({q,r,cx,cy}); maxX=Math.max(maxX,cx); maxY=Math.max(maxY,cy); }
   const svg=$("map"); svg.setAttribute("viewBox",`0 0 ${(maxX+HS*2).toFixed(0)} ${(maxY+HS*1.3).toFixed(0)}`);
   const sel=state.selTile;
   svg.innerHTML=cells.map(c=>{
-    const o=tileOwner(c.q,c.r); const fill=o?`hsl(${hueOf(o.nation_id)} 55% 45%)`:"#1e1e26";
+    const o=tileOwner(c.q,c.r); const fill=o?`hsl(${hueOf(o.nation_id)} 55% 45%)`:"#242430";
     const cls="hex"+(sel&&sel.q===c.q&&sel.r===c.r?" sel":"");
     return `<polygon class="${cls}" points="${hexPts(c.cx,c.cy)}" fill="${fill}" onclick="selectTile(${c.q},${c.r})"/>`;
   }).join("");
