@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "유저간 국가 설립·경제·전쟁·외교 오픈 웹앱 게임 (Google/Firebase 환경)",
+  "description": "유저간 국가 설립·경제·전쟁·외교 오픈 웹앱 게임 (Google Cloud Run + GCP)",
   "scripts": {
     "test:exact-amount": "tsx scripts/test-exact-amount.ts",
     "test": "npm run test:exact-amount",
