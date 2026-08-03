@@ -137,6 +137,16 @@ create table if not exists tick_log (
   events jsonb
 );
 
+-- 세계 지도: 육각 타일(axial 좌표 q,r). 각 타일은 한 국가의 영토이거나 미점유.
+create table if not exists territories (
+  q int not null,
+  r int not null,
+  nation_id text references nations(id),
+  claimed_at timestamptz not null default now(),
+  primary key (q, r)
+);
+create index if not exists territories_nation_idx on territories(nation_id);
+
 -- 세계 시계: 기원점(epoch)과 틱 간격. 서버가 경과 시간으로 현재 tick을 산출한다.
 create table if not exists world (
   id int primary key default 1 check (id = 1),

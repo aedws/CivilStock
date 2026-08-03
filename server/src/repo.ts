@@ -102,6 +102,46 @@ export async function listSecuritiesByNation(client: Client, nationId: string): 
   return rows;
 }
 
+// ---- 영토(육각 타일) ----
+
+/** axial 이웃 6개. */
+export function axialNeighbors(q: number, r: number): Array<[number, number]> {
+  return [[q + 1, r], [q - 1, r], [q, r + 1], [q, r - 1], [q + 1, r - 1], [q - 1, r + 1]];
+}
+
+export async function getTerritory(client: Client, q: number, r: number): Promise<{ nationId: string | null } | null> {
+  const { rows } = await client.query(`select nation_id from territories where q = $1 and r = $2 for update`, [q, r]);
+  return rows[0] ? { nationId: rows[0].nation_id } : null;
+}
+
+export async function claimTerritory(client: Client, q: number, r: number, nationId: string): Promise<void> {
+  await client.query(
+    `insert into territories (q, r, nation_id) values ($1,$2,$3)
+       on conflict (q, r) do update set nation_id = excluded.nation_id, claimed_at = now()`,
+    [q, r, nationId],
+  );
+}
+
+export async function listTerritories(client: Client): Promise<Array<Record<string, unknown>>> {
+  const { rows } = await client.query(
+    `select t.q, t.r, t.nation_id, n.name as nation_name, n.owner_user_id
+       from territories t join nations n on n.id = t.nation_id`,
+  );
+  return rows;
+}
+
+/** nationId가 (q,r)의 6이웃 중 하나라도 이미 점유하고 있는가(확장 인접성). */
+export async function nationOwnsAdjacent(client: Client, q: number, r: number, nationId: string): Promise<boolean> {
+  const nb = axialNeighbors(q, r);
+  const params: unknown[] = [nationId];
+  const tuples = nb.map((n) => { params.push(n[0], n[1]); return `($${params.length - 1},$${params.length})`; });
+  const { rows } = await client.query(
+    `select 1 from territories where nation_id = $1 and (q, r) in (${tuples.join(",")}) limit 1`,
+    params,
+  );
+  return rows.length > 0;
+}
+
 // ---- 계정: 유저 / 현금 / 포지션 ----
 
 export async function upsertUser(client: Client, id: string, handle: string | null): Promise<void> {

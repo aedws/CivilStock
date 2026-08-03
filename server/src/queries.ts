@@ -46,6 +46,17 @@ export async function listNations() {
   }
 }
 
+export async function getMap() {
+  const client = await pool.connect();
+  try {
+    const territories = await repo.listTerritories(client);
+    const nations = await repo.listNations(client);
+    return { cols: 14, rows: 9, territories, nations };
+  } finally {
+    client.release();
+  }
+}
+
 export async function getNationDetail(id: string) {
   const client = await pool.connect();
   try {

@@ -11,8 +11,8 @@ import { placeOrder, cancelOrder, provideLiquidity } from "./trade";
 import { createAccount, issueEquity, issueBond, issueEtf } from "./issue";
 import { declareDividend, splitShares } from "./actions";
 import { runDueTicks, getWorld } from "./tick";
-import { foundNation } from "./nations";
-import { listSecurities, getAccount, getMarket, listNations, getNationDetail } from "./queries";
+import { foundNation, claimTile } from "./nations";
+import { listSecurities, getAccount, getMarket, listNations, getNationDetail, getMap } from "./queries";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let indexHtml = "";
@@ -62,13 +62,19 @@ const server = http.createServer(async (req, res) => {
     if (method === "GET" && p === "/world") return send(res, 200, await getWorld());
     if (method === "GET" && p === "/securities") return send(res, 200, await listSecurities());
     if (method === "GET" && p === "/nations") return send(res, 200, await listNations());
+    if (method === "GET" && p === "/map") return send(res, 200, await getMap());
     if (method === "GET" && p === "/nation") return send(res, 200, await getNationDetail(str(Object.fromEntries(url.searchParams), "id")));
     if (method === "GET" && p === "/account") return send(res, 200, await getAccount(str(Object.fromEntries(url.searchParams), "userId")));
     if (method === "GET" && p === "/market") return send(res, 200, await getMarket(str(Object.fromEntries(url.searchParams), "securityId")));
 
     if (method === "POST" && p === "/nations") {
       const b = await readJson(req);
-      return send(res, 200, await foundNation({ id: str(b, "id"), name: str(b, "name"), currency: str(b, "currency"), ownerId: str(b, "ownerId"), grantCash: optStr(b, "grantCash") }));
+      return send(res, 200, await foundNation({ id: str(b, "id"), name: str(b, "name"), currency: str(b, "currency"), ownerId: str(b, "ownerId"), grantCash: optStr(b, "grantCash"),
+        capitalQ: b.capitalQ != null ? Number(b.capitalQ) : undefined, capitalR: b.capitalR != null ? Number(b.capitalR) : undefined }));
+    }
+    if (method === "POST" && p === "/map/claim") {
+      const b = await readJson(req);
+      return send(res, 200, await claimTile({ q: Number(b.q), r: Number(b.r), nationId: str(b, "nationId"), ownerId: str(b, "ownerId") }));
     }
     if (method === "POST" && p === "/accounts") {
       const b = await readJson(req);

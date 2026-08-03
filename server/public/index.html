@@ -29,19 +29,23 @@
   .acct-pick input{width:7rem}
   .wrap{max-width:1500px;margin:0 auto;padding:1rem}
 
-  /* HOME: 국가 그리드 */
-  .home-h{display:flex;align-items:baseline;gap:.6rem;margin:.5rem .2rem 1rem}
+  /* HOME: 세계 지도 */
+  .home-h{display:flex;align-items:baseline;gap:.6rem;margin:.5rem .2rem 1rem;flex-wrap:wrap}
   .home-h h1{font-size:1.4rem;margin:0;font-weight:800;letter-spacing:-.02em}
-  .ngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem}
-  .ncard{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem;cursor:pointer;transition:.12s}
-  .ncard:hover{border-color:var(--accent);transform:translateY(-2px)}
-  .ncard .flag{font-size:1.7rem}
-  .ncard .nm{font-weight:800;font-size:1.05rem;margin:.4rem 0 .1rem}
-  .ncard .meta{color:var(--muted);font-size:.8rem;line-height:1.5}
-  .ncard .co{margin-top:.6rem;font-size:.85rem}
-  .ncard.found{border-style:dashed;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:.4rem}
-  .ncard.found input{margin:0}
-  .ncard.found button{background:var(--accent);color:#fff;font-weight:700;padding:.55rem}
+  .maprow{display:grid;grid-template-columns:1fr 310px;gap:1rem;align-items:start}
+  @media(max-width:900px){.maprow{grid-template-columns:1fr}}
+  .mapwrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;overflow:auto}
+  svg#map{width:100%;height:auto;display:block}
+  .hex{stroke:#0d0d10;stroke-width:1.5;cursor:pointer;transition:filter .1s}
+  .hex:hover{filter:brightness(1.35)}
+  .hex.sel{stroke:#fff;stroke-width:3}
+  .mappanel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem;position:sticky;top:5rem}
+  .mappanel h3{margin:.1rem 0 .5rem;font-size:1.1rem}
+  .mappanel input{margin:.3rem 0}
+  .mappanel .p{width:100%;padding:.6rem;margin-top:.45rem;font-weight:700;border-radius:10px;color:#fff}
+  .mappanel .enter{background:var(--accent)} .mappanel .found{background:var(--up)} .mappanel .expand{background:var(--down)}
+  .legend{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.8rem}
+  .legend .li{display:flex;align-items:center;gap:.3rem;font-size:.78rem} .legend .sw{width:12px;height:12px;border-radius:3px}
 
   /* NATION: trading */
   .nation-top{display:flex;align-items:center;gap:.7rem;margin:.2rem .2rem 1rem}
@@ -113,10 +117,13 @@
   <div class="acct-pick"><span class="muted">플레이어</span><input id="user" value="me" onchange="switchUser()" /></div>
 </header>
 
-<!-- HOME: 국가 레이어 -->
+<!-- HOME: 세계 지도 -->
 <div class="wrap" id="home">
-  <div class="home-h"><h1>🌍 세계</h1><span class="muted">국가를 세우고 경제·증시를 직접 굴리세요</span></div>
-  <div class="ngrid" id="ngrid"></div>
+  <div class="home-h"><h1>🌍 세계 지도</h1><span class="muted">빈 타일=건국 · 내 영토 옆=확장 · 국가 타일=입국</span></div>
+  <div class="maprow">
+    <div class="mapwrap"><svg id="map" viewBox="0 0 800 400"></svg><div class="legend" id="legend"></div></div>
+    <aside class="mappanel" id="mappanel"><div class="muted">타일을 선택하세요</div></aside>
+  </div>
 </div>
 
 <!-- NATION: 경제(증시) -->
@@ -212,7 +219,7 @@
 
 <script>
 const $=(id)=>document.getElementById(id);
-const state={ user:"me", view:"home", nation:null, nationInfo:null, securities:[], selected:null, market:null, sec:null, side:"buy", otype:"limit", account:null, detTab:"chart" };
+const state={ user:"me", view:"home", nation:null, nationInfo:null, securities:[], selected:null, market:null, sec:null, side:"buy", otype:"limit", account:null, detTab:"chart", selTile:null };
 const sym=(c)=>c==="USD"?"$":(c?c+" ":"$");
 function money(minor,cur){ const n=Number(minor)/100; if(!isFinite(n)) return String(minor); return sym(cur)+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function bigMoney(minor,cur){ const n=Number(minor)/100; if(!isFinite(n)) return String(minor); if(n>=1e9) return sym(cur)+(n/1e9).toFixed(2)+"B"; if(n>=1e6) return sym(cur)+(n/1e6).toFixed(2)+"M"; if(n>=1e3) return sym(cur)+(n/1e3).toFixed(1)+"K"; return money(minor,cur); }
@@ -222,29 +229,59 @@ async function api(method,path,body,headers){ const r=await fetch(path,{method,h
 function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
 // ---- views ----
-function showHome(){ state.view="home"; state.nation=null; $("home").style.display=""; $("nation").style.display="none"; loadNations(); }
-async function loadNations(){
-  const list=await (await fetch("/nations")).json();
-  const el=$("ngrid"); el.innerHTML="";
-  (Array.isArray(list)?list:[]).forEach(n=>{
-    const d=document.createElement("div"); d.className="ncard"; d.onclick=()=>showNation(n.id);
-    d.innerHTML=`<div class="flag">🏛️</div><div class="nm">${n.name}</div>
-      <div class="meta">통치자 ${n.owner_user_id||"—"} · 통화 ${n.currency}</div>
-      <div class="co">🏢 기업 <b>${n.company_count}</b>곳</div>`;
-    el.appendChild(d);
-  });
-  const found=document.createElement("div"); found.className="ncard found";
-  found.innerHTML=`<div class="flag">➕</div><div class="nm">국가 설립</div>
-    <input id="nf_name" placeholder="국가 이름 (예: 아스트라)" />
-    <input id="nf_cur" value="USD" placeholder="통화 코드" />
-    <button onclick="foundNation()">건국 (초기 국고 지급)</button>`;
-  el.appendChild(found);
+function showHome(){ state.view="home"; state.nation=null; $("home").style.display=""; $("nation").style.display="none"; loadMap(); }
+
+// world map (hex, axial)
+let MAP=null; const HS=24;
+function axialPx(q,r){ return { x:HS*Math.sqrt(3)*(q+r/2), y:HS*1.5*r }; }
+function hexPts(cx,cy){ let p=[]; for(let i=0;i<6;i++){ const a=Math.PI/180*(60*i-90); p.push((cx+HS*Math.cos(a)).toFixed(1)+","+(cy+HS*Math.sin(a)).toFixed(1)); } return p.join(" "); }
+function neighbors(q,r){ return [[q+1,r],[q-1,r],[q,r+1],[q,r-1],[q+1,r-1],[q-1,r+1]]; }
+function hueOf(id){ let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))%360; return h; }
+function tileOwner(q,r){ return MAP&&MAP.territories?MAP.territories.find(t=>t.q===q&&t.r===r):null; }
+async function loadMap(){ MAP=await (await fetch("/map")).json(); renderMap(); renderLegend(); }
+function renderMap(){
+  if(!MAP) return; const cols=MAP.cols, rows=MAP.rows; const cells=[]; let maxX=0,maxY=0;
+  for(let r=0;r<rows;r++) for(let q=0;q<cols;q++){ const {x,y}=axialPx(q,r); const cx=x+HS*2, cy=y+HS*1.3; cells.push({q,r,cx,cy}); maxX=Math.max(maxX,cx); maxY=Math.max(maxY,cy); }
+  const svg=$("map"); svg.setAttribute("viewBox",`0 0 ${(maxX+HS*2).toFixed(0)} ${(maxY+HS*1.3).toFixed(0)}`);
+  const sel=state.selTile;
+  svg.innerHTML=cells.map(c=>{
+    const o=tileOwner(c.q,c.r); const fill=o?`hsl(${hueOf(o.nation_id)} 55% 45%)`:"#1e1e26";
+    const cls="hex"+(sel&&sel.q===c.q&&sel.r===c.r?" sel":"");
+    return `<polygon class="${cls}" points="${hexPts(c.cx,c.cy)}" fill="${fill}" onclick="selectTile(${c.q},${c.r})"/>`;
+  }).join("");
 }
-async function foundNation(){
-  const name=$("nf_name").value.trim(); if(!name) return toast("국가 이름을 입력하세요");
-  const id="n_"+Date.now(); const cur=($("nf_cur").value||"USD").trim();
-  const {ok}=await api("POST","/nations",{id,name,currency:cur,ownerId:state.user,grantCash:"100000000"});
-  if(ok){ toast("건국 완료: "+name); showNation(id); }
+function renderLegend(){
+  const nats=(MAP&&MAP.nations)?MAP.nations:[];
+  $("legend").innerHTML=nats.map(n=>`<span class="li"><span class="sw" style="background:hsl(${hueOf(n.id)} 55% 45%)"></span>${n.name}</span>`).join("");
+}
+function selectTile(q,r){
+  state.selTile={q,r}; renderMap();
+  const o=tileOwner(q,r); const panel=$("mappanel");
+  if(o){
+    panel.innerHTML=`<h3><span style="color:hsl(${hueOf(o.nation_id)} 60% 60%)">■</span> ${o.nation_name}</h3>
+      <div class="muted">통치자 ${o.owner_user_id}</div><div class="muted">타일 (${q}, ${r})</div>
+      <button class="p enter" onclick="showNation('${o.nation_id}')">입국 →</button>`;
+  } else {
+    const mine=(MAP.nations||[]).filter(n=>n.owner_user_id===state.user).map(n=>n.id);
+    const adj=mine.find(nid=>neighbors(q,r).some(([nq,nr])=>{ const t=tileOwner(nq,nr); return t&&t.nation_id===nid; }));
+    let html=`<h3>빈 타일 (${q}, ${r})</h3>`;
+    if(adj){ const nat=(MAP.nations||[]).find(n=>n.id===adj); html+=`<button class="p expand" onclick="expandTile(${q},${r},'${adj}')">🚩 ${nat.name} 영토로 확장</button>`; }
+    html+=`<div class="muted" style="margin-top:.7rem">여기에 새 국가 건국</div>
+      <input id="mf_name" placeholder="국가 이름 (예: 아스트라)" />
+      <input id="mf_cur" value="USD" placeholder="통화" />
+      <button class="p found" onclick="foundHere(${q},${r})">🏛️ 건국 (초기 국고 지급)</button>`;
+    panel.innerHTML=html;
+  }
+}
+async function foundHere(q,r){
+  const name=$("mf_name").value.trim(); if(!name) return toast("국가 이름을 입력하세요");
+  const cur=($("mf_cur").value||"USD").trim(); const id="n_"+Date.now();
+  const {ok}=await api("POST","/nations",{id,name,currency:cur,ownerId:state.user,grantCash:"100000000",capitalQ:q,capitalR:r});
+  if(ok){ toast("건국: "+name); showNation(id); }
+}
+async function expandTile(q,r,nationId){
+  const {ok}=await api("POST","/map/claim",{q,r,nationId,ownerId:state.user});
+  if(ok){ toast("영토 확장"); await loadMap(); selectTile(q,r); }
 }
 async function showNation(id){
   state.view="nation"; state.nation=id; state.selected=null;
