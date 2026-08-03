@@ -1,0 +1,21 @@
+{
+  "name": "civilstock-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CivilStock 권위 API 서버 (Cloud Run + Cloud SQL)",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pg": "^8.13.1",
+    "tsx": "^4.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.8.3"
+  }
+}
