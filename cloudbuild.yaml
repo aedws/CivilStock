@@ -1,13 +1,25 @@
-# Cloud Build: server/Dockerfile을 리포 루트 컨텍스트로 빌드해 Artifact Registry에 푸시.
-# 사용: gcloud builds submit --config cloudbuild.yaml .
+# Cloud Build: server/Dockerfile을 리포 루트 컨텍스트로 빌드 → Artifact Registry 푸시 → Cloud Run 배포.
+# 트리거(자동)와 수동(gcloud builds submit --config cloudbuild.yaml .) 모두 이 파일 하나로 배포까지 끝난다.
 steps:
+  # 1) 이미지 빌드
   - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'server/Dockerfile', '-t', 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/civilstock/server', '.']
+  # 2) 푸시
+  - name: gcr.io/cloud-builders/docker
+    args: ['push', 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/civilstock/server']
+  # 3) Cloud Run 배포 (시크릿·환경변수 선언적으로 재적용)
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
     args:
-      - build
-      - -f
-      - server/Dockerfile
-      - -t
-      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/civilstock/server
-      - .
+      - run
+      - deploy
+      - civilstock-server
+      - --image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/civilstock/server
+      - --region=asia-southeast1
+      - --allow-unauthenticated
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,TICK_SECRET=TICK_SECRET:latest
+      - --set-env-vars=TICKS_PER_YEAR=8760,TICK_SECONDS=3600
 images:
   - asia-southeast1-docker.pkg.dev/$PROJECT_ID/civilstock/server
+options:
+  logging: CLOUD_LOGGING_ONLY

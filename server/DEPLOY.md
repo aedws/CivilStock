@@ -31,22 +31,28 @@ same-region으로. `PROJECT_ID` 등은 자신의 값으로 바꿔 실행한다.
   openssl rand -hex 32 | gcloud secrets create TICK_SECRET --data-file=-
   ```
 
-## 3. 컨테이너 빌드 + Cloud Run 배포
+## 3. 빌드 + 배포 (한 줄 — cloudbuild.yaml이 빌드→푸시→배포까지)
 
-- [ ] 빌드(빌드 컨텍스트 = 리포 루트, Dockerfile은 server/):
-  ```bash
-  gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT_ID/civilstock/server \
-    --file server/Dockerfile .
-  ```
-- [ ] 배포(비밀 주입만 — Cloud SQL 커넥터 불필요):
-  ```bash
-  gcloud run deploy civilstock-server \
-    --image REGION-docker.pkg.dev/PROJECT_ID/civilstock/server \
-    --region REGION --allow-unauthenticated \
-    --set-secrets DATABASE_URL=DATABASE_URL:latest,TICK_SECRET=TICK_SECRET:latest \
-    --set-env-vars TICKS_PER_YEAR=8760
-  ```
+```bash
+gcloud builds submit --config cloudbuild.yaml .
+```
 - [ ] 헬스체크: `curl https://<run-url>/healthz` → `{"ok":true}`.
+
+## 3-b. 자동 배포 (권장 — 한 번만 설정하면 이후 손 안 댐)
+
+푸시될 때마다 자동으로 빌드+배포되게 한다.
+
+- [ ] **IAM(1회)** — 빌드 SA가 Cloud Run에 배포하도록 권한 부여:
+  ```bash
+  PN=$(gcloud projects describe civilstock --format='value(projectNumber)')
+  gcloud projects add-iam-policy-binding civilstock \
+    --member="serviceAccount:${PN}-compute@developer.gserviceaccount.com" --role=roles/run.admin
+  gcloud projects add-iam-policy-binding civilstock \
+    --member="serviceAccount:${PN}-compute@developer.gserviceaccount.com" --role=roles/iam.serviceAccountUser
+  ```
+- [ ] **트리거(1회)** — Cloud Run 콘솔 → 서비스 `civilstock-server` → **연속 배포 설정**
+  → GitHub 연결 → 리포 `aedws/CivilStock` + 브랜치 → 빌드 형식 **Cloud Build 구성 파일**
+  → 경로 `/cloudbuild.yaml` → 저장. 이후 해당 브랜치 푸시마다 자동 배포(진행: Cloud Build → 기록).
 
 ## 4. worldTick 스케줄러 (Cloud Scheduler)
 
