@@ -124,6 +124,33 @@
   .tools label.f{display:block;font-size:.72rem;color:var(--muted);margin:.3rem 0 .1rem}
   .tools button.act{width:100%;margin-top:.5rem;padding:.5rem;background:var(--accent);color:#fff;font-weight:700}
 
+  .topnav{gap:1.3rem}
+  .menu{display:flex;gap:1.1rem} .menu a{cursor:pointer;font-weight:700;color:var(--muted);font-size:.9rem} .menu a.active,.menu a:hover{color:var(--text)}
+  .idxstrip{display:flex;gap:.6rem;overflow-x:auto;padding:.1rem .1rem .8rem}
+  .idxcard{flex:0 0 auto;min-width:132px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:.55rem .7rem;cursor:pointer}
+  .idxcard .it{font-weight:700;font-size:.82rem} .idxcard .ip{font-weight:700} .idxcard .ic{font-size:.75rem}
+  .idxcard svg{width:100%;height:24px;display:block;margin-top:.15rem}
+  .natgrid{display:grid;grid-template-columns:1fr 300px;gap:1rem;align-items:start}
+  @media(max-width:1000px){.natgrid{grid-template-columns:1fr}}
+  .sidebar{position:sticky;top:4.6rem}
+  .thead,.trow{display:grid;grid-template-columns:2.2fr 1fr .9fr 1fr 1fr 1.3fr;gap:.5rem;align-items:center}
+  .thead{padding:.5rem 1rem;border-bottom:1px solid var(--border);font-size:.74rem;color:var(--muted)}
+  .thead .r,.trow .r{text-align:right}
+  .trow{padding:.55rem 1rem;border-top:1px solid var(--border);cursor:pointer}
+  .trow:hover{background:var(--panel2)} .trow.sel{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+  .tname{display:flex;align-items:center;gap:.5rem;min-width:0}
+  .logo-badge{width:26px;height:26px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:#fff}
+  .trow .rk{min-width:1rem} .trow .price{font-weight:600}
+  .ssbar2{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--down);min-width:56px}
+  .ssbar2 i{background:var(--up);height:100%}
+  @media(max-width:820px){.hidem{display:none!important}.thead,.trow{grid-template-columns:2fr 1fr .9fr}}
+  .detbar{display:flex;align-items:center;gap:.6rem;padding:.8rem 1rem;border-bottom:1px solid var(--border)}
+  .detbar .spacer{flex:1} .detbar .dtk{font-size:1.05rem;font-weight:800} .detbar .dprice{font-size:1.3rem;font-weight:800;padding:0} .detbar .dchg{font-weight:700;font-size:.85rem;padding:0}
+  .detsub{display:grid;grid-template-columns:1.5fr 1fr}
+  @media(max-width:760px){.detsub{grid-template-columns:1fr}}
+  .detchart{border-right:1px solid var(--border)}
+  .ticker{display:flex;gap:1.4rem;overflow-x:auto;padding:.6rem 1rem;font-size:.8rem;background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-top:1rem}
+  .ticker .ti{display:flex;gap:.4rem;white-space:nowrap;font-variant-numeric:tabular-nums}
   #toast{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);
     border-radius:10px;padding:.6rem 1rem;max-width:90vw;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;font-size:.85rem}
   #toast.show{opacity:1}
@@ -131,10 +158,14 @@
 </style>
 </head>
 <body>
-<header>
+<header class="topnav">
   <div class="logo" onclick="showHome()">Civil<b>Stock</b></div>
-  <div class="clock" id="clock">tick —</div>
+  <nav class="menu">
+    <a onclick="showHome()">🌍 세계</a>
+    <a id="nav_trade" class="active" style="display:none" onclick="backToList()">거래</a>
+  </nav>
   <div class="spacer"></div>
+  <div class="clock" id="clock">tick —</div>
   <div class="acct-pick"><span class="muted">플레이어</span><input id="user" value="me" onchange="switchUser()" /></div>
 </header>
 
@@ -155,49 +186,64 @@
     <span class="nm" id="n_name">—</span>
     <span class="muted" id="n_meta"></span>
   </div>
-  <main>
-    <section class="card" style="overflow:hidden">
-      <div class="atabs" id="atabs"></div>
-      <div id="mlist"></div>
-    </section>
-
-    <section class="card" style="overflow:hidden">
-      <div class="dhead"><span class="dtk" id="d_tk">—</span><span class="tag" id="d_type"></span></div>
-      <div class="dprice num" id="d_price">—</div>
-      <div class="dchg num" id="d_chg"></div>
-      <div class="stats" id="d_stats"></div>
-      <div class="dtabs"><button id="dt_chart" class="on" onclick="setDetTab('chart')">차트</button>
-        <button id="dt_book" onclick="setDetTab('book')">호가</button>
-        <button id="dt_trades" onclick="setDetTab('trades')">체결</button></div>
-      <div id="pane_chart"><div class="tf" id="tf"></div><svg class="chart" id="chart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg><div class="chartinfo" id="chartinfo"></div></div>
-      <div id="pane_book" style="display:none"><div class="obook" id="obook"></div></div>
-      <div id="pane_trades" style="display:none"><div class="trlist" id="trades"></div></div>
-
-      <div class="tabs">
-        <button id="tab_buy" class="on buy" onclick="setSide('buy')">구매</button>
-        <button id="tab_sell" class="sell" onclick="setSide('sell')">판매</button>
-      </div>
-      <div class="ticket">
-        <div class="seg"><button id="seg_limit" class="on" onclick="setType('limit')">지정가</button>
-          <button id="seg_market" onclick="setType('market')">시장가</button></div>
-        <div class="fieldrow" id="pricerow"><label>가격</label>
-          <button class="stp" onclick="stepPrice(-1)">−</button><input id="o_price" class="num" oninput="calcTotal()" /><button class="stp" onclick="stepPrice(1)">+</button></div>
-        <div class="fieldrow"><label>수량</label>
-          <button class="stp" onclick="stepQty(-1)">−</button><input id="o_qty" class="num" value="1" oninput="calcTotal()" /><button class="stp" onclick="stepQty(1)">+</button></div>
-        <div class="quick"><button onclick="qpct(.1)">10%</button><button onclick="qpct(.25)">25%</button>
-          <button onclick="qpct(.5)">50%</button><button onclick="qpct(1)">최대</button></div>
-        <div class="avail"><span class="muted" id="o_availlabel">주문가능</span><span class="num muted" id="o_avail">—</span></div>
-        <div class="total"><span class="muted">총 주문금액</span><span class="num" id="o_total">—</span></div>
-        <button class="submit buy" id="submit" onclick="submitOrder()">구매하기</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>내 계좌</h2>
+  <div class="idxstrip" id="idxstrip"></div>
+  <div class="natgrid">
+    <div class="natmain">
+      <!-- 목록 -->
+      <section class="card" id="natlist" style="overflow:hidden">
+        <div class="atabs" id="atabs"></div>
+        <div class="thead">
+          <span>종목</span><span class="r">현재가</span><span class="r">등락률</span>
+          <span class="r hidem">거래대금</span><span class="r hidem">시가총액</span><span class="hidem">매수·매도</span>
+        </div>
+        <div id="mlist"></div>
+      </section>
+      <!-- 세부 -->
+      <section class="card" id="natdetail" style="display:none;overflow:hidden">
+        <div class="detbar">
+          <button class="back" onclick="backToList()">← 목록</button>
+          <span class="dtk" id="d_tk">—</span><span class="tag" id="d_type"></span>
+          <span class="spacer"></span>
+          <span class="dprice num" id="d_price">—</span><span class="dchg num" id="d_chg"></span>
+        </div>
+        <div class="stats" id="d_stats"></div>
+        <div class="detsub">
+          <div class="detchart">
+            <div class="dtabs"><button id="dt_chart" class="on" onclick="setDetTab('chart')">차트</button>
+              <button id="dt_book" onclick="setDetTab('book')">호가</button>
+              <button id="dt_trades" onclick="setDetTab('trades')">체결</button></div>
+            <div id="pane_chart"><div class="tf" id="tf"></div><svg class="chart" id="chart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg><div class="chartinfo" id="chartinfo"></div></div>
+            <div id="pane_book" style="display:none"><div class="obook" id="obook"></div></div>
+            <div id="pane_trades" style="display:none"><div class="trlist" id="trades"></div></div>
+          </div>
+          <div class="detorder">
+            <div class="tabs">
+              <button id="tab_buy" class="on buy" onclick="setSide('buy')">구매</button>
+              <button id="tab_sell" class="sell" onclick="setSide('sell')">판매</button>
+            </div>
+            <div class="ticket">
+              <div class="seg"><button id="seg_limit" class="on" onclick="setType('limit')">지정가</button>
+                <button id="seg_market" onclick="setType('market')">시장가</button></div>
+              <div class="fieldrow" id="pricerow"><label>가격</label>
+                <button class="stp" onclick="stepPrice(-1)">−</button><input id="o_price" class="num" oninput="calcTotal()" /><button class="stp" onclick="stepPrice(1)">+</button></div>
+              <div class="fieldrow"><label>수량</label>
+                <button class="stp" onclick="stepQty(-1)">−</button><input id="o_qty" class="num" value="1" oninput="calcTotal()" /><button class="stp" onclick="stepQty(1)">+</button></div>
+              <div class="quick"><button onclick="qpct(.1)">10%</button><button onclick="qpct(.25)">25%</button>
+                <button onclick="qpct(.5)">50%</button><button onclick="qpct(1)">최대</button></div>
+              <div class="avail"><span class="muted" id="o_availlabel">주문가능</span><span class="num muted" id="o_avail">—</span></div>
+              <div class="total"><span class="muted">총 주문금액</span><span class="num" id="o_total">—</span></div>
+              <button class="submit buy" id="submit" onclick="submitOrder()">구매하기</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <aside class="card sidebar">
       <div class="net"><div class="muted" id="p_cur">USD</div><div class="big num" id="p_net">—</div></div>
       <div id="p_positions" style="margin-top:.5rem"></div>
-    </section>
-  </main>
+    </aside>
+  </div>
+  <div class="ticker" id="ticker"></div>
 
   <details class="tools">
     <summary>⚙ 이 국가에서 발행 · 유동성 · 재무 (운영 도구)</summary>
@@ -253,7 +299,7 @@ async function api(method,path,body,headers){ const r=await fetch(path,{method,h
 function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
 // ---- views ----
-function showHome(){ state.view="home"; state.nation=null; $("home").style.display=""; $("nation").style.display="none"; loadMap(); }
+function showHome(){ state.view="home"; state.nation=null; $("home").style.display=""; $("nation").style.display="none"; $("nav_trade").style.display="none"; loadMap(); }
 
 // world map (hex, axial)
 let MAP=null; const HS=24;
@@ -348,9 +394,8 @@ async function showNation(id){
   state.nationInfo=d.nation; state.securities=Array.isArray(d.securities)?d.securities:[];
   $("n_name").textContent=d.nation?d.nation.name:id;
   $("n_meta").textContent=d.nation?`· 통치자 ${d.nation.owner_user_id} · ${d.nation.currency}`:"";
-  await renderMarketList();
-  if(state.securities[0]) selectSecurity(state.securities[0].id); else clearDetail();
-  loadAccount();
+  $("nav_trade").style.display=""; $("nav_trade").textContent="🏛 "+(d.nation?d.nation.name:id);
+  await renderMarketList(); showList(); loadAccount();
 }
 function clearDetail(){ $("d_tk").textContent="종목 없음"; $("d_type").textContent=""; $("d_price").textContent="—"; $("d_chg").textContent=""; $("d_stats").innerHTML=""; $("chart").innerHTML=""; }
 
@@ -373,31 +418,49 @@ function rowSpark(m){
 }
 function volume(m){ return (m&&m.trades)?m.trades.reduce((a,x)=>a+Number(x.price||0)*Number(x.quantity||0),0):0; }
 function buyRatio(m){ if(!m||!m.trades||!m.trades.length) return 50; let b=0,s=0; for(const t of m.trades){ const q=Number(t.quantity||0); if(t.taker_side==="buy")b+=q; else s+=q; } const tot=b+s; return tot? Math.round(b/tot*100):50; }
+let MKT={};
 async function renderMarketList(){
   renderAssetTabs();
   const rows=await Promise.all(state.securities.map(async s=>({s,m:await (await fetch("/market?securityId="+encodeURIComponent(s.id))).json()})));
+  MKT={}; rows.forEach(({s,m})=>MKT[s.id]=m);
+  renderIndexStrip(rows); renderTicker(rows);
   const shown=rows.filter(({s})=>matchTab(s));
   const el=$("mlist"); el.innerHTML="";
-  if(!shown.length){ el.innerHTML=`<div class="mrow muted" style="cursor:default;grid-template-columns:1fr">이 분류에 상장 종목이 없어요. 아래 운영 도구에서 발행하세요.</div>`; return; }
+  if(!shown.length){ el.innerHTML=`<div class="trow muted" style="grid-template-columns:1fr;cursor:default">이 분류에 상장 종목이 없어요. 운영 도구에서 발행하세요.</div>`; return; }
   shown.forEach(({s,m},i)=>{
-    const last=lastPrice(m), chg=changePct(m); const cls=chg>0?"up":chg<0?"down":"muted";
-    const br=buyRatio(m); const vol=volume(m);
-    const div=document.createElement("div"); div.className="mrow"+(state.selected===s.id?" sel":""); div.dataset.id=s.id; div.onclick=()=>selectSecurity(s.id);
-    div.innerHTML=`<div class="rk">${i+1}</div>
-      <div class="mname"><span class="tk">${s.ticker}</span><span class="tag">${sectorOf(s)}</span>
-        <div class="sub">${vol? "거래대금 "+bigMoney(vol,s.currency):"거래 없음"}<span class="ssbar"><i style="width:${br}%"></i></span></div></div>
-      ${rowSpark(m)}
-      <div class="mright"><div class="price num">${last==null?"—":money(last,s.currency)}</div><div class="chg num ${cls}">${chg==null?"":(chg>0?"+":"")+chg.toFixed(2)+"%"}</div></div>`;
+    const last=lastPrice(m), chg=changePct(m); const cls=chg>0?"up":chg<0?"down":"muted"; const br=buyRatio(m), vol=volume(m);
+    const cap=(last!=null&&m.sharesOutstanding)?Math.round(Number(last)*Number(m.sharesOutstanding)):null;
+    const div=document.createElement("div"); div.className="trow"+(state.selected===s.id?" sel":""); div.dataset.id=s.id; div.onclick=()=>selectSecurity(s.id);
+    div.innerHTML=`<div class="tname"><span class="rk muted num">${i+1}</span><span class="logo-badge" style="background:hsl(${hueOf(s.id)} 55% 45%)">${(s.ticker||"?")[0]}</span>
+        <div style="min-width:0"><span class="tk">${s.ticker}</span> <span class="tag">${sectorOf(s)}</span></div></div>
+      <div class="r price num">${last==null?"—":money(last,s.currency)}</div>
+      <div class="r chg num ${cls}">${chg==null?"":(chg>0?"+":"")+chg.toFixed(2)+"%"}</div>
+      <div class="r hidem num muted">${vol?bigMoney(vol,s.currency):"—"}</div>
+      <div class="r hidem num muted">${cap==null?"—":bigMoney(cap,s.currency)}</div>
+      <div class="hidem"><div class="ssbar2" title="매수 ${br}%"><i style="width:${br}%"></i></div></div>`;
     el.appendChild(div);
   });
 }
+function idxSpark(m){ const t=priceSeries(m); if(t.length<2) return ""; const min=Math.min(...t),max=Math.max(...t),rng=(max-min)||1; const up=t[t.length-1]>=t[0]; const pts=t.map((p,i)=>`${(i/(t.length-1))*120},${24-((p-min)/rng)*22-1}`).join(" "); return `<svg viewBox="0 0 120 26" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up?getCss('--up'):getCss('--down')}" stroke-width="1.5"/></svg>`; }
+function renderIndexStrip(rows){
+  const eq=rows.filter(({s})=>s.type==="equity").slice(0,8);
+  $("idxstrip").innerHTML=eq.map(({s,m})=>{ const last=lastPrice(m),chg=changePct(m); const cls=chg>0?"up":chg<0?"down":"muted";
+    return `<div class="idxcard" onclick="selectSecurity('${s.id}')"><div class="it">${s.ticker}</div><div class="ip num">${last==null?"—":money(last,s.currency)}</div><div class="ic num ${cls}">${chg==null?"":(chg>0?"+":"")+chg.toFixed(2)+"%"}</div>${idxSpark(m)}</div>`; }).join("");
+}
+function renderTicker(rows){
+  $("ticker").innerHTML=rows.map(({s,m})=>{ const last=lastPrice(m),chg=changePct(m); const cls=chg>0?"up":chg<0?"down":"muted";
+    return `<span class="ti"><b>${s.ticker}</b><span class="num">${last==null?"—":money(last,s.currency)}</span><span class="num ${cls}">${chg==null?"":(chg>0?"+":"")+chg.toFixed(1)+"%"}</span></span>`; }).join("");
+}
+function showList(){ $("natlist").style.display=""; $("natdetail").style.display="none"; document.querySelectorAll(".trow").forEach(e=>e.classList.toggle("sel", e.dataset.id===state.selected)); }
+function backToList(){ if(state.view!=="nation"){ showHome(); return; } showList(); }
 function priceSeries(m){ if(m&&m.history&&m.history.length>=2) return m.history.map(Number); if(m&&m.trades&&m.trades.length>=2) return [...m.trades].reverse().map(x=>Number(x.price)); return []; }
 function lastPrice(m){ if(m&&m.trades&&m.trades.length) return m.trades[0].price; if(m&&m.ammSpot) return m.ammSpot; if(m&&m.history&&m.history.length) return m.history[m.history.length-1]; return null; }
 function changePct(m){ const s=priceSeries(m); if(s.length<2) return null; const open=s[0],last=s[s.length-1]; if(!open) return null; return (last-open)/open*100; }
 
 // ---- detail ----
 async function selectSecurity(id){
-  state.selected=id; const s=state.securities.find(x=>x.id===id); if(!s) return;
+  const s=state.securities.find(x=>x.id===id); if(!s) return; state.selected=id;
+  $("natlist").style.display="none"; $("natdetail").style.display="";
   const m=await (await fetch("/market?securityId="+encodeURIComponent(id))).json();
   state.market=m; state.sec=s;
   $("d_tk").textContent=s.ticker; $("d_type").textContent=s.type;
@@ -415,7 +478,7 @@ async function selectSecurity(id){
   renderTf(); drawChart(m); drawBook(m,s); drawTrades(m,s);
   if(last!=null && document.activeElement!==$("o_price")) $("o_price").value=last;
   calcTotal();
-  document.querySelectorAll(".mrow").forEach(e=>{ e.classList.toggle("sel", e.dataset.id===id); });
+  document.querySelectorAll(".trow").forEach(e=>{ e.classList.toggle("sel", e.dataset.id===id); });
 }
 function setDetTab(t){ state.detTab=t; ["chart","book","trades"].forEach(x=>{ $("pane_"+x).style.display=x===t?"":"none"; $("dt_"+x).className=x===t?"on":""; }); }
 const TFS=[{k:"s",l:"30초",n:30},{k:"m",l:"1분",n:20},{k:"m5",l:"5분",n:12},{k:"d",l:"1일",n:8}];
@@ -520,7 +583,7 @@ async function refreshNation(){ const d=await (await fetch("/nation?id="+encodeU
 
 // ---- boot ----
 showHome(); loadWorld();
-setInterval(()=>{ loadWorld(); if(state.view==="nation"&&state.selected) selectSecurity(state.selected); }, 7000);
+setInterval(()=>{ loadWorld(); if(state.view==="nation"){ if($("natdetail").style.display!=="none"&&state.selected) selectSecurity(state.selected); else renderMarketList(); } }, 7000);
 </script>
 </body>
 </html>
